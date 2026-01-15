@@ -1,0 +1,223 @@
+---
+title: "Week-9"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(conflicted)
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+# Refer to the simple linear regression model you built last week. Include 1-3 more variables into your regression model.
+
+```{r}
+# Fit the multiple linear regression model
+lm_model <- lm(popularity ~ danceability + energy + valence, data = data)
+
+# Display model summary
+summary(lm_model)
+
+```
+
+### **Interpretation of the Multiple Linear Regression Output**
+Here, we fitted a multiple linear regression model with **popularity** as the dependent variable and **danceability, energy, and valence** as independent variables.
+
+### **1. Model Equation**
+The regression equation based on the coefficients:
+\[
+\text{popularity} = 51.3749 - 2.4805 \cdot \text{danceability} - 18.9689 \cdot \text{energy} + 0.6928 \cdot \text{valence}
+\]
+
+### **2. Coefficient Analysis**
+- **Intercept (51.3749, p < 2e-16)**
+  - When all predictors are 0, the predicted popularity is **51.37**.
+  - The intercept is statistically significant (**p-value < 0.001***).
+
+- **Danceability (-2.4805, p = 0.165)**
+  - Has a negative effect on popularity, but **not statistically significant** (p-value > 0.05).
+  - This means that **danceability does not have a strong impact on popularity** in the data.
+
+- **Energy (-18.9689, p < 2e-16**)**
+  - Has a strong **negative** impact on popularity.
+  - **Statistically significant** (p-value < 0.001***), meaning higher energy is associated with **lower** popularity.
+
+- **Valence (0.6928, p = 0.574)**
+  - Very weak positive effect on popularity.
+  - **Not statistically significant** (p-value > 0.05), meaning valence **does not strongly influence popularity**.
+
+### **3. Model Performance**
+- **Multiple R-squared = 0.01943 (1.94%)**
+  - The model explains **only ~1.94%** of the variability in popularity.
+  - This means the model is **not a good predictor** of popularity.
+
+- **Adjusted R-squared = 0.01911**
+  - Adjusts for the number of predictors but is still very low.
+
+- **F-statistic = 59.43, p-value < 2.2e-16**
+  - The model as a whole is statistically significant, meaning at least one predictor has an effect.
+
+### **Key Takeaways**
+1. **Energy is the only significant predictor** (p < 0.001) and has a **strong negative effect** on popularity.
+2. **Danceability and valence are not significant**, meaning they do not reliably predict popularity.
+3. **The model has very low predictive power (R² = 1.94%)**, indicating that **other factors influence song popularity**.
+
+```{r}
+
+data|> 
+  ggplot(mapping = aes(x = energy, y = popularity, color = danceability)) + 
+  geom_point(size = 0.5) + 
+  geom_smooth(method = 'lm', se = FALSE, color = 'Orange') + 
+  geom_hline(yintercept = mean(data$popularity, na.rm = TRUE), linetype = 'dashed') + 
+  theme_minimal()
+
+```
+
+The orange regression line slopes downward, indicating a negative correlation between energy and popularity. This suggests that songs with higher energy tend to have lower popularity, and vice versa.
+
+# Try out either an interaction term or a binary term to start.
+
+# Adding an interaction term
+```{r}
+lm_model_interaction <- lm(popularity ~ danceability * energy + valence, data = data)
+summary(lm_model_interaction)
+
+```
+energy is the only statistically significant predictor (p-value = 4.93e-05), indicating a strong relationship with popularity. danceability, valence, and the interaction term danceability:energy have high p-values (> 0.05), meaning their effects are not statistically significant.We have to include valence as it has a significant relationship with the target variable and enhances model performance. It can be excluded if it introduces multicollinearity with other features or doesn’t improve predictive power.
+
+
+# Consider adding other integer or continuous variables.
+# Adding Another Continuous Variable: Tempo
+```{r}
+
+lm_model_tempo <- lm(popularity ~ danceability + energy + tempo, data = data)
+summary(lm_model_tempo)
+
+```
+The model is statistically significant overall (based on F-statistic).
+
+Among predictors:
+
+energy has a strong negative association with popularity and is highly significant.
+
+tempo has a positive association with popularity and is also significant.
+
+danceability does not have a statistically significant effect on popularity.
+
+The low R-squared value suggests that this model explains very little of the variability in popularity, indicating that other factors may better predict popularity. **Tempo** is to be included in a model as it influences the target variable, such as song popularity, user engagement, or mood-based playlists, as it directly affects the song's energy and rhythm. However, we can exclude it if it is highly correlated with other features like **energy** or **danceability**, leading to multicollinearity or redundancy.
+
+
+
+# Your model for this data dive should have 2-4 terms.
+Yes, for this data dive, my model has 4 terms- 
+
+Valence: Captures the mood or emotional content of a song (positive/negative).
+
+Tempo: Represents the speed of the song, influencing energy and rhythm.
+
+Energy (optional): Reflects the intensity of a track, which could correlate with tempo and valence.
+
+Danceability (optional): Measures how suitable a song is for dancing, which often correlates with tempo and energy.
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Define the model with Valence, Tempo, Energy, and Danceability as predictors
+model <- lm(popularity ~ valence + tempo + energy + danceability, data = data)
+
+# View the summary of the model
+summary(model)
+
+```
+The model suggests that **tempo** and **energy** are significant predictors of **popularity**, with **tempo** having a positive impact and **energy** a negative one. **Valence** and **danceability** are not statistically significant predictors. The model explains only **2.14%** of the variance in popularity (R-squared = 0.02141), indicating a weak fit. Despite this, the overall model is statistically significant (p-value < 2.2e-16).
+
+
+# Evaluate this model. 
+```{r}
+# Generate predictions using the model
+data$predictions <- predict(model, newdata = data)
+
+# Evaluate model performance
+mse <- mean((data$popularity - data$predictions)^2)
+r2 <- 1 - sum((data$popularity - data$predictions)^2) / sum((data$popularity - mean(data$popularity))^2)
+
+# Print MSE and R-squared
+cat("Mean Squared Error: ", mse, "\n")
+cat("R-squared: ", r2, "\n")
+
+# Print model coefficients
+cat("Model Coefficients:\n")
+print(coef(model))
+
+```
+
+The Mean Squared Error (MSE) of the model is 580.79, indicating a high average error between predicted and actual popularity values. The R-squared value is 0.0203, meaning the model explains only 2% of the variability in popularity, showing poor predictive performance. The coefficients indicate that valence and tempo have a slight positive impact, while energy and danceability negatively affect popularity.
+
+```{r}
+plot(data$predictions, data$popularity - data$predictions,
+     xlab = "Predicted Popularity", ylab = "Residuals",
+     main = "Residual Plot")
+abline(h = 0, col = "red")
+```
+
+The residuals are spread widely and randomly around the horizontal line (at 0), but there is a visible funnel shape — meaning the spread of residuals increases as predicted popularity increases.
+
+
+
+# At the very least, use the 5 diagnostic plots discussed in class to identify any issues with your model.
+# For each plot, point out any indications of issues with the model. Otherwise, explain how the plot supports the claim that an assumption is met.
+# Try to measure the severity of any issues as well as the level of confidence you have in an assumption being met.
+
+
+# 1 Plot Residuals vs Fitted Values
+```{r}
+plot(model, which = 1)
+```
+This "Residuals vs Fitted" plot evaluates the linear regression model's assumptions. The residuals (errors) should ideally be randomly scattered around the horizontal line at zero, indicating no patterns or bias. However, the funnel shape suggests heteroscedasticity (non-constant variance), which may require model improvement or transformation of variables.
+
+# 2. Plot Residuals vs X values 
+
+```{r}
+plot(model, which = 2)
+```
+This Q-Q Residuals plot compares the standardized residuals of the regression model to a normal distribution. The points mostly follow the diagonal line, but deviations at the tails (both ends) suggest that the residuals are not perfectly normally distributed.
+
+# 3. Scale-Location Plot
+```{r}
+plot(model, which = 3)
+```
+This **Scale-Location plot** is used to assess the assumption of homoscedasticity (constant variance) in a linear regression model. The x-axis represents fitted values, while the y-axis shows the square root of standardized residuals. Ideally, the red line should be horizontal, and the points should be evenly scattered; however, the increasing spread suggests growth, indicating non-constant variance in residuals.
+
+# 4. Cook's Distance
+```{r}
+# Cook's Distance by Observation
+plot(model, which = 4)
+```
+
+This **Cook's Distance plot** identifies observations that have a significant influence on the regression model's fitted values. Observations 473, 3236, and 3667 have the highest Cook's Distance values, indicating they exert disproportionate leverage on the model. These points should be investigated further as they are likely outliers or influential data points affecting the stability of the regression results.
+
+# Finally,
+
+While performing the analysis, I realized the importance of granular aggregation and probabilistic grouping to capture hidden trends within the dataset. The key takeaway was that a structured approach to grouping can yield valuable insights into large datasets with multiple attributes, guiding decision-making for music streaming platforms and artists alike.
+
+
+
+
+

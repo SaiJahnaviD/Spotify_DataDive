@@ -1,0 +1,101 @@
+---
+title: "Week-11"
+output: html_document
+---
+
+
+```{r}
+library(boot)
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(tidyverse)
+library(purrr)
+```
+
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+# Build a linear (or generalized linear) model as you like.Use whatever response variable and explanatory variables you prefer.
+
+```{r}
+model <- lm(popularity ~ danceability + energy + acousticness + valence + tempo + loudness + duration_ms, data = data)
+summary(model)
+```
+# Use the tools from previous weeks to diagnose the model.
+# 1.Residual Histogram
+```{r}
+# Calculate residuals
+residuals <- residuals(model)
+
+# Plot histogram of residuals
+hist(residuals, main="Histogram of Residuals", xlab="Residuals", col="lightblue", border="black")
+```
+
+The histogram displays the distribution of residuals from the model, showing their frequency across different ranges. It suggests that the residuals are approximately symmetric but may not perfectly follow a normal distribution.
+
+# 2. Residuals vs Fitted Values Plot
+```{r}
+# Plot residuals vs fitted values
+plot(fitted(model), residuals, main="Residuals vs Fitted Values", xlab="Fitted Values", ylab="Residuals", pch=20)
+abline(h=0, col="red", lwd=2)  # Add a horizontal line at 0
+```
+The plot shows residuals versus fitted values from a linear regression model. Residuals are scattered randomly around the red line at zero, indicating no obvious pattern and suggesting the model fits the data reasonably well.
+
+#3. QQ-Plot
+
+```{r}
+# Generate QQ-Plot
+qqnorm(residuals)
+qqline(residuals, col="red", lwd=2)
+```
+
+The Normal Q-Q plot compares the residuals of a model to a theoretical normal distribution. Most points align with the red diagonal line, indicating approximate normality, but deviations at the tails suggest potential outliers or non-normal behavior. This may impact the model's assumptions and require further diagnostics.
+
+#4. Cook's Distance by Observation
+
+```{r}
+# Calculate Cook's Distance
+cooks_d <- cooks.distance(model)
+
+# Plot Cook's Distance by observation
+plot(cooks_d, type="h", main="Cook's Distance by Observation", xlab="Observation", ylab="Cook's Distance", col="blue")
+abline(h=4 / length(cooks_d), col="red", lwd=2)  # Threshold line
+```
+
+The graph represents Cook's Distance for each observation in a dataset, which measures the influence of individual observations on the regression model.Most observations have very low Cook's Distance (below the red threshold line), indicating they have minimal impact on the model's coefficients. A few spikes above the red threshold line suggest influential observations that could disproportionately affect the model's results.
+
+
+# Highlight any issues with the model.
+
+# Key Model Issues Identified:
+Non-Normal Residuals: Q-Q plot deviations at the tails and histogram asymmetry suggest residuals may violate normality assumptions.
+
+Potential Heteroscedasticity: Slight funnel-shaped pattern in residuals vs. fitted implies non-constant variance, risking biased error estimates.
+
+Influential Outliers: High Cook's Distance values and outlier residuals indicate data points disproportionately affecting model accuracy.
+
+
+# Interpret at least one of the coefficients.
+
+Let's interpret the "danceability" coefficient from the model:
+
+Coefficient for Danceability: -4.742e+00 (or -4.742)
+
+Interpretation: For every one-unit increase in danceability, the dependent variable (e.g., popularity, if it's in your model) is expected to decrease by 4.742 units, holding all other variables constant.
+
+Significance: The p-value for danceability is 0.010899, which is less than 0.05, indicating that the relationship between danceability and the dependent variable is statistically significant at the 5% level.
+
+Context: A negative coefficient means that as the danceability of a track increases, the outcome variable decreases, suggesting that higher danceability may negatively influence the target variable(popularity) in this model.
+
+
+
+

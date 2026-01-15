@@ -1,0 +1,173 @@
+---
+title: "Data Dive - 10"
+output: html_notebook
+---
+```{r}
+install.packages("dplyr")
+
+```
+```{r}
+install.packages("ggplot2")
+```
+
+
+```{r}
+install.packages("readr")
+```
+
+```{r}
+install.packages("tidyverse")
+```
+
+
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(conflicted)
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+data
+```
+
+# Select an interesting binary column of data, or one which can be reasonably converted into a binary variable. This should be something worth modeling.
+
+
+```{r}
+# Identify binary columns
+binary_columns <- data |> select(where(~ n_distinct(.) == 2)) |> names()
+
+# Print binary columns
+print(binary_columns)
+
+# Display unique values in the mode column
+unique_values <- unique(data$mode)
+
+# Print the unique values
+print(unique_values)
+
+# Print values in mode column
+print(data$mode)
+```
+The binary column in the dataset is "mode". The values in it are: 0 and 1. 
+The binary column is essential for applying logistic regression to predict probabilities and interpret the relationship between predictors (like danceability) and a binary outcome.
+
+This binary nature makes it a natural choice for logistic regression, as it allows us to model and interpret the relationship between musical features (like danceability) and the probability of a song being in a particular key. 
+
+Insight: The mode column is binary (0 = Minor, 1 = Major), meaning we can use logistic regression to model it.
+
+Significance: Understanding mode helps analyze whether certain features influence a song's emotional tone.
+Further Questions: Do other categorical variables (like key or explicit content) also show strong patterns with mode?
+
+
+# Build a logistic regression model for this variable, using between 1-4 explanatory variables. 
+
+Using danceability, energy, and tempo as explanatory variables.
+```{r}
+# Fit the logistic regression model
+logit_model <- glm(mode ~ danceability + energy + tempo, data = data, family = binomial)
+
+# Display model summary
+summary(logit_model)
+
+# Display model coefficients
+coef(summary(logit_model))
+
+# To interpret them as odds ratios, exponentiate them
+exp(coef(logit_model))
+```
+
+Insight: Danceability negatively affects mode, meaning more danceable songs are likely minor. Energy positively affects mode, meaning high-energy songs are more likely major. Tempo has no significant effect.
+Significance: These findings suggest that dance-friendly songs tend to have minor tones, while high-energy songs are typically major, influencing music production and recommendation algorithms.
+Further Questions: Would adding features like valence (happiness) or key improve the model's accuracy?
+
+# Interpret the coefficients, and explain what they mean in your notebook.
+
+Intercept (0.5746, p = 0.0011)
+Interpretation: When all predictors (danceability, energy, tempo) are zero, the log-odds of mode = 1 is 0.5746.
+Exponentiation: exp(0.5746) ≈ 1.776, meaning that the baseline odds of mode = 1 are 1.776 times that of mode = 0 when all predictors are zero.
+
+1. Danceability (-0.8736, p < 0.0001)
+Interpretation: A 1-unit increase in danceability decreases the log-odds of mode = 1 by 0.8736.
+Exponentiation: exp(-0.8736) ≈ 0.417, meaning that higher danceability decreases the odds of mode = 1 by ~58.3%.
+Conclusion: Danceability has a strong negative impact on mode.
+
+2. Energy (0.3327, p = 0.0083)
+Interpretation: A 1-unit increase in energy increases the log-odds of mode = 1 by 0.3327.
+Exponentiation: exp(0.3327) ≈ 1.394, meaning that higher energy increases the odds of mode = 1 by ~39.4%.
+Conclusion: Energy has a moderate positive impact on mode.
+
+3. Tempo (0.0005, p = 0.4815)
+Interpretation: A 1-unit increase in tempo increases the log-odds of mode = 1 by 0.0005.
+Exponentiation: exp(0.0005) ≈ 1.0005, meaning that tempo has almost no effect on mode.
+Conclusion: Since p = 0.48 (greater than 0.05), tempo is not statistically significant.
+
+
+
+1. **Mode (target variable)**: 0 = Minor (sad), 1 = Major (happy).  
+2. **Danceability (-0.87, significant)**: More danceable songs are **less likely** to be in a major mode.  
+3. **Energy (+0.33, significant)**: Higher energy makes a song **more likely** to be in a major mode.  
+4. **Tempo (+0.0005, not significant)**: Song speed does **not affect** major or minor mode.  
+5. **Key insight**: High-energy songs tend to be major, while danceable songs tend to be minor.  
+
+
+# Using the Standard Error for at least one coefficient, build a C.I. for that coefficient, and translate its meaning.
+
+```{r}
+
+# Given values from the model
+beta_hat <- -0.8736  # Coefficient for danceability
+se <- 0.1386         # Standard Error for danceability
+
+# Calculate 95% Confidence Interval in log-odds scale
+lower_bound_log <- beta_hat - (1.96 * se)
+upper_bound_log <- beta_hat + (1.96 * se)
+
+# Convert everything to the odds ratio scale (e^log-odds)
+lower_bound_or <- exp(lower_bound_log)
+upper_bound_or <- exp(upper_bound_log)
+beta_hat_or <- exp(beta_hat)
+
+# Print the result (Odds ratio scale)
+cat("Beta (odds ratio) for danceability: ", beta_hat_or, "\n")
+cat("95% CI for danceability (Odds ratio scale): [", lower_bound_or, ",", upper_bound_or, "]\n")
+
+```
+beta_hat_or = 0.417: This means that for every one-unit increase in danceability, the odds of the outcome (e.g., song popularity or another binary outcome) are multiplied by 0.417. This suggests a decrease in the odds of the outcome as danceability increases.
+
+The 95% CI for the odds ratio is between 0.318 and 0.548. This means we can be 95% confident that the true odds ratio for danceability lies within this range.
+
+To exponentiate everything (both beta_hat and the confidence interval), we make sure that both the coefficient and its confidence interval are on the same scale (odds ratio), which is much easier to interpret than the log-odds scale. This approach is statistically correct and gives a more meaningful interpretation, particularly when we need to explain the effect of a predictor in terms of changes in odds rather than log-odds.
+
+### Explanation of the Output:
+
+- **Beta (odds ratio) for danceability: 0.417446**  
+   This means that for every **one-unit increase** in **danceability**, the **odds** of the outcome (such as song popularity or a binary outcome) decrease by a factor of **0.417**. In other words, a higher danceability score is associated with a **lower likelihood** of the event occurring, as the odds of the outcome are **reduced** by approximately **58.3%** (since 1 - 0.417 = 0.583, or a decrease of 58.3%).
+
+- **95% CI for danceability (Odds ratio scale): [0.3181425, 0.5477458]**  
+   This means that with **95% confidence**, the true odds ratio for danceability lies between **0.318** and **0.548**. The confidence interval tells us the range of possible values for the odds ratio, indicating that the true effect of danceability on the odds of the event could vary within this range. Since this range does not include **1**, we can conclude that the effect of danceability on the outcome is statistically significant at the 95% confidence level.
+
+### Key Insights:
+- A **one-unit increase** in danceability is associated with a **decrease in the odds** of the event occurring.
+- The **95% confidence interval** suggests a **reliable association**, as the interval does not cross 1. 
+- The result indicates that danceability has a **moderate negative effect** on the odds of the outcome, meaning songs with higher danceability are less likely to have the outcome (depending on the context, such as popularity, classification, etc.).
+
+
+Further Questions: 
+Does the effect of danceability on the odds of the outcome vary across different genres or types of music?
+Does this pattern hold across different genres? Would the effect change if we analyzed specific decades?
+What happens to the odds ratio for danceability when controlling for other factors (e.g., artist popularity, release date, or song length)?
+How does danceability compare to other musical features (e.g., tempo, loudness, valence) in terms of predicting the outcome?
+
+
+
+

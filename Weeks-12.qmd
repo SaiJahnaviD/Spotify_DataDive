@@ -1,0 +1,271 @@
+---
+title: "Week-12"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+# Install the pageviews package
+install.packages("pageviews")
+
+# Load the library
+library(pageviews)
+```
+```{r}
+install.packages("tsibble")
+library(tsibble)
+
+```
+
+
+
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+```{r}
+names(data)
+```
+### Select a column of your data that encodes time (e.g., "date", "timestamp", "year", etc.). Convert this into a Date in R. If you do not have a time-based column of data: find a Wikipedia page that is related to your dataset. Then, extract a time series of page views for that page using the wikipedia page views websiteLinks to an external site. or the R package used in this week's lab.
+
+```{r}
+# Extract daily page views for "Spotify" Wikipedia page
+spotify_views <- article_pageviews(
+  project = "en.wikipedia",
+  article = "Spotify",
+  start = as.Date("2023-01-01"),
+  end = as.Date("2023-12-31"),
+  user_type = "user",     # Only user traffic 
+  platform = "all"        # All platforms: desktop, mobile-web, etc.
+)
+
+# View the first few rows
+head(spotify_views)
+```
+
+
+```{r}
+# Plot the time series of page views
+ggplot(spotify_views, aes(x = date, y = views)) +
+  geom_line(color = "steelblue", size = 1) +
+  labs(title = "Daily Wikipedia Page Views for 'Spotify' in 2023",
+       x = "Date",
+       y = "Views") +
+  theme_minimal()
+```
+
+
+```{r}
+nrow(data)
+nrow(spotify_views)
+```
+
+```{r}
+# View the first few rows to understand the structure of the data
+head(spotify_views)
+```
+### Choose a column of data to analyze over time. This should be a "response-like" variable that is of particular interest.
+I choosed **popularity**.
+
+### Create a tsibble object of just the date and response variable. Then, plot your data over time. Consider different windows of time.
+```{r}
+library(tsibble)
+
+# Ensure the date column is in Date format
+spotify_views$date <- as.Date(spotify_views$date)
+
+# Create a tsibble object with date as the index and views as the response variable
+spotify_ts <- spotify_views |>
+  select(date, views) |>
+  rename(popularity = views) |>
+  as_tsibble(index = date)
+
+# View the time series object
+head(spotify_ts)
+
+```
+
+
+
+```{r}
+# Plot popularity over time
+ggplot(spotify_ts, aes(x = date, y = popularity)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(
+    title = "Spotify Track Popularity Over Time (Based on Wikipedia Views)",
+    x = "Date",
+    y = "Popularity (Views)"
+  ) + theme_minimal()
+```
+
+
+```{r}
+# Aggregate by week
+weekly_ts <- spotify_ts |>
+  index_by(week = ~ lubridate::floor_date(., "week")) |>
+  summarise(mean_popularity = mean(popularity, na.rm = TRUE))
+
+# Plot
+ggplot(weekly_ts, aes(x = week, y = mean_popularity)) +
+  geom_line(color = "darkgreen") +
+  labs(title = "Weekly Average Popularity", x = "Week", y = "Avg Views") +
+  theme_minimal()
+
+```
+```{r}
+# By month
+monthly_ts <- spotify_ts |>
+  index_by(month = ~ lubridate::floor_date(., "month")) |>
+  summarise(avg_popularity = mean(popularity, na.rm = TRUE))
+
+ggplot(monthly_ts, aes(x = month, y = avg_popularity)) +
+  geom_line(color = "orange") +
+  labs(title = "Monthly Trends in Popularity", x = "Month", y = "Average Views") +
+  theme_minimal()
+
+```
+
+# What stands out immediately?
+Statistical Significance: The consistency of the downward trend across different time aggregations (daily, weekly, monthly) strongly suggests statistical significance in the overall decline, particularly for the monthly data where the trend appears strongest (as noise is reduced through aggregation).
+
+Practical Implications: This analysis suggests that Spotify track popularity (as measured by Wikipedia views) experienced a fundamental shift downward in early 2023, potentially indicating: A major change in user behavior, Platform algorithm changes, Competition from other music services, Seasonal effects early in the year that didn't repeat.
+
+
+# Use linear regression to detect any upwards or downwards trends.
+
+```{r}
+# Fit the linear regression model
+model <- lm(popularity ~ date, data = spotify_ts)
+summary(model)
+```
+
+```{r}
+ggplot(spotify_ts, aes(x = date, y = popularity)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  labs(title = "Trend of Popularity over Date", 
+       x = "Date", y = "Popularity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+Based on the graph showing the "Trend of Popularity over Date" from January 2023 to January 2024, Data Trend Analysis:
+
+The graph displays a clear overall downward trend in popularity over the one-year period, with the smoothed blue line showing a decline from approximately 8,500 in January 2023 to around 4,500 by January 2024. This represents nearly a 50% decrease in popularity over the year.
+
+
+# Do you need to subset the data for multiple trends?
+
+Yes, subsetting the data would be beneficial for several reasons:
+
+There appear to be distinct clusters in the data that suggest different patterns within the overall trend
+
+The first quarter of 2023 shows significantly higher popularity values (10,000-13,000 range) compared to other periods
+
+There's a visible increase in variability and some higher points again in late 2023/early 2024
+
+The simple linear trend line (using the formula 'y ~ x') doesn't capture these potential cyclical or seasonal patterns
+
+# How strong are these trends?
+
+The overall downward trend appears moderately strong, evidenced by:
+
+The consistent negative slope of the blue trend line throughout the entire period
+
+The relatively narrow confidence interval (blue shaded area) around the trend line, suggesting statistical significance
+
+However, the substantial scatter of data points around the trend line indicates high variability
+
+The graph shows considerable dispersion of data points, with many falling far from the trend line. This suggests that while the downward trend is clear, it explains only a portion of the variation in popularity. The high degree of scatter indicates that other factors beyond the simple time variable are likely influencing popularity values.
+
+
+# Use smoothing to detect at least one season in your data, and interpret your results.
+
+```{r}
+spotify_ts |> ggplot(mapping = aes(x = date, y = popularity)) + 
+  geom_point(size = 1, alpha = 0.4) + 
+  geom_smooth(span = 0.2, color = 'blue', se = FALSE)+theme_classic()
+```
+## Interpretation of the Smoothing Result
+
+The plot uses **LOESS smoothing** (with `span = 0.2`) to visualize the trend in the "popularity" variable over time (from January 2023 to January 2024).
+
+### Key Observations
+
+1. **Seasonal Pattern Detected:**
+   - There is a **clear seasonal trend** in the data.
+   - **Early 2023:** Popularity starts high, peaking around January.
+   - **Spring 2023:** There is a **sharp decline** in popularity from January to around April.
+   - **Mid-2023:** Popularity remains relatively low and stable, with minor fluctuations.
+   - **Late 2023:** There are small increases and decreases, but no major spikes until a slight uptick at the end of the year.
+
+2. **Possible Seasonality:**
+   - The **initial peak** and subsequent drop suggest a **seasonal effect**—possibly related to an event or release that caused a spike in popularity at the start of the year.
+   - The **smaller oscillations** throughout the rest of the year may indicate **minor seasonal or periodic effects**, but they are less pronounced than the initial drop.
+
+3. **Noise and Outliers:**
+   - The scatterplot shows some **outliers** (especially high values) that the smoother does not follow closely, which is expected since the smoother is designed to capture the general trend, not every fluctuation.
+
+
+# Can you illustrate the seasonality using ACF or PACF?
+
+```{r}
+acf(spotify_ts, ci = 0.95, na.action = na.exclude)
+```
+This ACF plot for spotify_ts suggests the series is not strongly seasonal but may have a trend or be non-stationary. 
+
+```{r}
+pacf(spotify_ts, na.action = na.exclude, xlab = 'lag', main = "PACF for Spotify pageviews" )
+```
+This PACF plot for Spotify pageviews shows a strong correlation at lag 1 and little to no significant correlation at higher lags. This suggests that an AR(1) model could be a good starting point for modeling this time series analysis.
+
+
+
+
+To detect seasonality in my data, I used LOESS smoothing with a span of 0.2, as shown in the plot. Here’s what I observed:
+
+Clear Seasonality:
+At the beginning of 2023, there is a noticeable peak in popularity, with values above 10,000. This suggests a strong seasonal effect or a specific event that drove popularity up during this period.
+
+Sharp Decline and Stabilization:
+After this initial peak, popularity drops sharply through the first quarter of the year, reaching a low around April 2023. From that point onward, the popularity remains relatively stable, fluctuating between 5,000 and 7,000, with only minor ups and downs.
+
+Minor Fluctuations:
+Throughout the rest of the year, I noticed some smaller oscillations, but none are as dramatic as the initial drop. This indicates that while there may be some minor seasonal effects, the main seasonality is concentrated at the start of the year.
+
+Outliers:
+There are a few outlier points, especially high values, that the smoother doesn’t follow closely. This is expected, as the smoothing method is designed to capture the overall trend rather than every individual fluctuation.
+
+### Conclusion:
+
+From this analysis, I can conclude that there is at least one strong season in my data, with a major peak in popularity at the start of the year, followed by a sharp decline and a stable period. This suggests that timing plays a significant role in popularity, and it may be beneficial to align major releases or promotions with the period where the peak occurs.
+
+If I want to understand the causes behind these trends more deeply, I could further investigate what happened during the peak period or use more advanced time series analysis techniques.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

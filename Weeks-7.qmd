@@ -1,0 +1,295 @@
+---
+title: "Week-7"
+output: html_notebook
+---
+
+```{r}
+install.packages("pwr")
+```
+
+
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(conflicted)
+# Load required packages
+library(pwr)   # For power analysis
+library(boot)  # For bootstrapping
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+```{r}
+# View basic structure of the dataset
+str(data)
+summary(data)
+
+# Check for missing values
+colSums(is.na(data))
+```
+### For this week, we will do AB Testing within the context of your data set. So, you'll be using hypothesis testing to calculate some difference between two groups. For each of the following, you'll need at least one main variable, and some way to define "Group A" and "Group B" (e.g., if you have a categorical column, you could consider "category 1" and "[the rest]"). Your main variable should either be continuous or binary (i.e., "success" or "failure").
+
+### Let's compare high-energy vs. low-energy songs to see if energy influences popularity.
+```{r}
+# Define Group A (high energy songs) and Group B (low energy songs)
+group_A <- data |> filter(energy > 0.7)  # High energy
+group_B <- data |> filter(energy < 0.3)  # Low energy
+
+# Check sizes of each group
+nrow(group_A)
+nrow(group_B)
+
+# Compare means of popularity for both groups
+mean(group_A$popularity, na.rm = TRUE)
+mean(group_B$popularity, na.rm = TRUE)
+
+```
+Before running a t-test, we check:
+Normality (Using Shapiro-Wilk test)
+Variance Equality (Using Levene’s Test)
+
+```{r}
+# Shapiro-Wilk test for normality (sampled data for large datasets)
+shapiro.test(sample(group_A$popularity, 50))
+shapiro.test(sample(group_B$popularity, 50))
+
+# Levene’s test for equal variances
+# leveneTest(data$popularity ~ as.factor(data$energy > 0.7))
+```
+
+```{r}
+t.test(group_A$popularity, group_B$popularity, alternative = "greater", var.equal = FALSE)
+wilcox.test(group_A$popularity, group_B$popularity, alternative = "greater")
+```
+### **Conclusion from A/B Testing Results**  
+
+#### **1. Welch Two Sample t-test Results**  
+- **t-value** = -6.5555 (negative means Group A has a lower mean than Group B)  
+- **p-value** = **1** (very high, meaning no statistical significance)  
+- **Mean of Group A (high energy songs)** = 34.29  
+- **Mean of Group B (low energy songs)** = 46.58  
+- **95% Confidence Interval**: (-15.39, ∞) → Since 0 is within this range, we **fail to reject** the null hypothesis.  
+
+#### **2. Wilcoxon Rank-Sum Test Results (Mann-Whitney U Test)**  
+- **W-value** = 234940  
+- **p-value** = **1** (again, very high, meaning no significant difference)  
+
+---
+
+### **Interpretation**  
+**We fail to reject the null hypothesis (H₀).**  
+This means there is **no significant evidence** that high-energy songs (Group A) have higher popularity than low-energy songs (Group B).  
+
+**Insights:**  
+- The results suggest that **energy level does not strongly influence song popularity**.  
+- In fact, low-energy songs seem to have a slightly higher mean popularity, but this difference is **not statistically significant**.  
+- If you were expecting a strong effect, it might be useful to test **other features** (e.g., danceability, tempo, or key) or consider **interaction effects** between multiple variables.  
+
+
+
+
+### Devise two different null hypotheses based on two different columns data (i.e., each hypothesis gets a different column of data).
+### For Hypothesis 1: Determine if you have enough data to perform a hypothesis test using the Neyman-Pearson framework (i.e., choose a test, alpha level, Type 2 Error, etc., and reject or fail-to reject ...). If you have enough data, show your sample size calculation, perform the test, and interpret results. If there is not enough data, explain why. Make sure your alpha level, power level, and minimum effect size are intentional, i.e., explain why you chose them. A good start here is to think about the practical purpose of your test, and the risk of a False Negative (or of a False Positive ...) assuming your null hypothesis is true.
+```{r}
+
+```
+
+
+```{r}
+# ------------------------------
+# HYPOTHESIS 1: Neyman-Pearson Framework
+# Null Hypothesis (H0): The difference in mean danceability between major and minor key songs is zero.
+# ------------------------------
+
+# Check unique values in the 'key' column
+table(data$key)
+
+# Convert key to a binary factor (0 = Minor, 1 = Major)
+data$key_binary <- ifelse(data$key >= 5, "Major", "Minor")
+
+# Calculate summary statistics
+danceability_summary <- data |>
+  group_by(key_binary) |>
+  summarise(count = n(), mean_danceability = mean(danceability, na.rm = TRUE),
+            sd_danceability = sd(danceability, na.rm = TRUE))
+
+print(danceability_summary)
+
+# Set parameters for power analysis
+alpha <- 0.1  # Type I error probability
+power <- 0.85  # Probability of detecting a real difference
+effect_size <- 0.3  # Cohen’s d (small to medium effect)
+
+# Compute required sample size per group
+sample_size <- power.t.test(delta = effect_size, 
+                            sd = sd(data$danceability, na.rm = TRUE), 
+                            power = power, 
+                            sig.level = alpha, 
+                            alternative = "two.sided")$n
+
+cat("Required Sample Size per Group:", ceiling(sample_size), "\n")
+
+# Check if we have enough data
+if (min(danceability_summary$count) >= ceiling(sample_size)) {
+  # Perform independent t-test
+  t_test_result <- t.test(danceability ~ key_binary, data = data, var.equal = FALSE)
+  print(t_test_result)
+
+  # Interpretation
+  if (t_test_result$p.value < alpha) {
+    print("Reject H0: Significant difference in danceability between Major and Minor key songs.")
+  } else {
+    print("Fail to reject H0: No significant difference in danceability between Major and Minor key songs.")
+  }
+} else {
+  print("Not enough data to perform hypothesis test.")
+}
+```
+```{r}
+
+```
+
+
+### For Hypothesis 2: Perform a hypothesis test using Fisher's Significance Testing framework (i.e., p-value, recommendation, etc.). For this, you should only need to choose a test, interpret the p-value, and give some reasoning for why we should be confident in your data and your conclusions.
+```{r}
+
+# ------------------------------
+# HYPOTHESIS 2: Fisher's Significance Testing
+# Null Hypothesis (H0): The difference in mean tempo between high-energy and low-energy songs is zero.
+# ------------------------------
+
+# Define high-energy and low-energy groups (threshold: median energy)
+energy_threshold <- median(data$energy, na.rm = TRUE)
+data$energy_category <- ifelse(data$energy >= energy_threshold, "High Energy", "Low Energy")
+
+# Perform a Wilcoxon Rank-Sum test (non-parametric alternative to t-test)
+wilcox_result <- wilcox.test(tempo ~ energy_category, data = data)
+
+print(wilcox_result)
+
+# Interpretation
+if (wilcox_result$p.value < 0.05) {
+  print("Reject H0: Significant difference in tempo between High and Low energy songs.")
+} else {
+  print("Fail to reject H0: No significant difference in tempo between High and Low energy songs.")
+}
+
+```
+```{r}
+
+```
+
+### Build two visualizations that best illustrate your results, one for each null hypothesis.
+```{r}
+
+# ------------------------------
+# Visualizing the Results
+# ------------------------------
+
+# Boxplot of danceability by key type
+
+# Create 'key_binary' column: classify key as 'Low' (0-5) or 'High' (6-11)
+data$key_binary <- ifelse(data$key <= 5, "Low", "High")
+
+# Convert to a factor for proper ordering
+data$key_binary <- factor(data$key_binary, levels = c("Low", "High"))
+
+
+ggplot(data, aes(x = key_binary, y = danceability, fill = key_binary)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Danceability Distribution by Key Type", x = "Key Type", y = "Danceability") +
+  theme_minimal()
+
+# Boxplot of tempo by energy category
+ggplot(data, aes(x = energy_category, y = tempo, fill = energy_category)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Tempo Distribution by Energy Level", x = "Energy Category", y = "Tempo") +
+  theme_minimal()
+
+
+```
+
+```{r}
+
+
+#Visualization: Violin Plot for Tempo Distribution
+# ------------------------------
+ggplot(data, aes(x = energy_category, y = tempo, fill = energy_category)) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.1, color = "black", outlier.shape = NA) +
+  labs(title = "Tempo Distribution by Energy Level",
+       x = "Energy Category",
+       y = "Tempo (BPM)") + 
+  theme_minimal() +
+  scale_fill_manual(values = c("High Energy" = "#FF5733", "Low Energy" = "#3498DB")) +
+  theme(legend.position = "none")
+
+
+```
+
+# Explanation of Tests and Visualizations Used
+1 Statistical Test: Wilcoxon Rank-Sum Test
+Why Wilcoxon Rank-Sum Test instead of a t-test?
+
+A t-test assumes that the data is normally distributed and has similar variances across groups.
+However, in real-world datasets like your Spotify music dataset, tempo may not be normally distributed.
+Wilcoxon Rank-Sum Test (also called the Mann-Whitney U test) is a non-parametric test, meaning it does not assume normality. It simply checks if the distributions of two groups differ significantly.
+How it works:
+
+The test ranks all observations from both groups together.
+It then compares the sum of the ranks between the two groups.
+If one group consistently has higher (or lower) ranks than the other, the test indicates a statistically significant difference.
+Why is this test appropriate for our data?
+
+Tempo might not be normally distributed.
+Energy levels are categorical (High vs. Low), but tempo is continuous.
+Since we are testing whether tempo differs between high-energy and low-energy songs, this test is a robust choice.
+
+2 Visualization: Violin Plot
+Why a violin plot instead of a boxplot or histogram?
+Histograms are useful for one-group distributions but don't compare two groups well.
+Boxplots show median and spread but don’t reveal detailed distribution shapes.
+
+Violin plots combine the best of both:
+Like a boxplot, it shows medians and quartiles (the boxplot overlay).
+Like a density plot, it shows the full distribution shape of tempo in both energy categories.
+Helps identify patterns (e.g., bimodal distributions, skewness, etc.).
+How to interpret the violin plot?
+
+If tempo distributions differ greatly in shape or center between high-energy and low-energy songs, then energy is likely influencing tempo.
+If the medians (the middle white lines inside the violin) are far apart, this suggests a real difference in central tendency.
+If the distributions overlap a lot, then tempo is likely independent of energy.
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+```
+
+```{r}
+
+```
+
+
+```{r}
+```
+
+# Conclusion
+The Wilcoxon test helps us determine if tempo differs significantly between high-energy and low-energy songs, even if the data is not normally distributed.
+The violin plot provides visual confirmation of any patterns seen in the test.
+Together, these methods increase confidence in our statistical conclusions by combining quantitative (p-value) and qualitative (graphical) insights.

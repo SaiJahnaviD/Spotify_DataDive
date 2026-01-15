@@ -1,0 +1,293 @@
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(conflicted)
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+
+# Model Critique
+
+## Goal 1: Business Scenario
+
+### Step 1: Create the Business Context
+Business Context (Scenario): A music streaming company (like Spotify) aims to optimize its playlist recommendations by understanding which audio features most influences, track popularity among the listeners.
+
+### Step 2: Define Customer or Audience
+Customer or Audience: 
+
+1.Playlist curators inside the streaming company (Spotify’s content team)
+2. Marketing teams targeting user engagement
+3. Music producers and artists looking to tailor their new releases
+
+They will use my analysis results to recommend songs better, boost engagement, and guide new music production.
+
+4. Any Data Analyst or Music Trend Observers can get many notes from this work.
+
+### Step 3: Write a SMART Problem Statement
+(Recall: SMART = Specific, Measurable, Achievable, Relevant, Time-bound)
+
+Problem Statement: To enhance user engagement by 15% over the next 6 months, the content team at Spotify needs to identify which song features (such as energy, danceability, and valence) most strongly influence track popularity among the users.
+
+
+### Step 4: Define Scope
+Scope:
+
+Variables to use from the Spotify dataset:
+- popularity (target variable)
+- energy, danceability, valence, acousticness, tempo, loudness, instrumentalness, etc. (input variables/features)
+
+Analyses performed:
+- Correlation analysis to identify feature relationships
+- Linear regression and Logistic Regression feature importance to rank the factors
+- Cluster analysis to group songs by feature similarity
+
+Visualizations: heatmaps, scatterplots to support findings
+
+Purpose: The purpose of this analysis is to derive insights from Spotify music data regarding trends in track popularity, artist collaborations, and audio feature characteristics across different genres and release years.
+
+
+### Step 5: Define the Objective
+Objective: Successfully identified and ranked the top audio features that influence track popularity for users, to inform playlist recommendations and marketing strategies.
+
+
+
+## Goal 2: Model Critique
+
+### 1. Issue: Basic Correlations Are Not Enough
+Problem: When only simple correlations or basic scatterplots are in the observation, audio features likely interact with each other (for example, energy and danceability together may predict popularity better than individually).
+
+### Improvement 1: Multiple Linear Regression
+
+```{r}
+model_lm <- lm(popularity ~ energy + danceability + valence + acousticness + tempo, data = data)
+summary(model_lm)
+```
+
+
+- The multiple linear regression shows a very low R-squared (2.1%), meaning the model explains very little of the variation in song popularity.
+- Only energy, acousticness, and tempo are statistically significant predictors (p < 0.05).
+- The large residuals and low explanatory power suggest that linear models may not be appropriate for predicting popularity from these audio features alone.
+
+
+
+
+
+### 2. Issue: Linear Models Assume Linearity
+Problem: Linear models assume the relationship between features and popularity is linear, but real-world music preferences could be non-linear.
+
+### Improvement 2: Random Forest Regression Capture non-linear patterns and feature importance without needing to assume a straight-line relationship.
+
+```{r}
+install.packages("randomForest")
+```
+
+
+```{r}
+library(randomForest)
+
+set.seed(123)
+rf_model <- randomForest(popularity ~ energy + danceability + valence + acousticness + tempo, 
+                         data = data, 
+                         importance = TRUE, 
+                         ntree = 500)
+# View model summary
+print(rf_model)
+```
+- The Random Forest regression model explains 50.68% of the variance in song popularity, which is a significant improvement over the linear regression model.
+- The model was trained using 500 trees, and the mean squared residuals are relatively low, indicating a better fit.
+- This suggests that Random Forest is more suitable for predicting song popularity compared to the linear model, capturing more complex relationships between the features.
+
+
+```{r}
+# Plotting feature importance
+varImpPlot(rf_model)
+```
+
+
+Two variable importance plots from a random forest model
+- From the above graph, 
+The left plot uses the percentage increase in Mean Squared Error (%IncMSE) metric, ranking `energy` as the most important variable.
+The right plot uses the increase in Node Purity (IncNodePurity) metric, ranking `acousticness` as the most important variable.
+
+
+### Improvement 3: Clustering Songs into Groups (Unsupervised Learning)
+Problem: The business users (playlist creators) might want to group similar songs together based on audio features, but simple filtering (like energy > 0.5) isn't good enough.
+
+Solution:
+Using K-Means Clustering to automatically discover groups of songs with similar characteristics.
+
+```{r}
+install.packages("factoextra")
+```
+
+```{r}
+
+library(factoextra)
+
+set.seed(123)
+
+# Select numeric features
+features <- data[, c("energy", "danceability", "valence", "acousticness", "tempo")]
+
+# Scale the features
+features_scaled <- scale(features)
+
+# Apply K-Means clustering
+kmeans_model <- kmeans(features_scaled, centers = 4, nstart = 25)
+
+# Add cluster labels to the dataset
+data$cluster <- as.factor(kmeans_model$cluster)
+
+# Visualize clusters (2D PCA plot)
+fviz_cluster(kmeans_model, data = features_scaled)
+```
+
+
+The K-Means algorithm identified four clusters, the visualization uses Principal Component Analysis (PCA) to reduce the dimensionality of the features and display these four song clusters in a two-dimensional plot (Dim1 and Dim2), which together capture 61% of the data's variance.
+
+This plot visually represents how the algorithm has grouped the songs, showing the relative positions and separation of the clusters based on their underlying audio characteristics in this reduced feature space.
+
+
+
+
+# Goal 3:  Ethical and Epistemological Concerns
+
+
+
+When working with the Spotify music tracks dataset to analyze factors such as track popularity, artist collaborations, release years, and audio features (e.g., energy, valence), there are several **ethical** and **epistemological concerns** that must be addressed.
+
+These concerns touch on data biases, model assumptions, and societal implications. 
+
+#### **1. Overcoming Biases (Existing or Potential)**
+
+   - **Selection Bias:**
+     - **Concern:** The dataset primarily include popular tracks or tracks from major artists, leading to a bias toward certain genres or artist types. For instance, if only highly popular songs are included, the model may not generalize well to lesser-known or indie tracks, skewing our understanding of musical trends.
+     - **Mitigation:** Ensure the dataset represents a wide variety of genres, popularity levels, and artist types. One could consider integrating tracks with lower play counts or from emerging artists to provide a more comprehensive analysis.
+
+   - **Historical Bias:**
+     - **Concern:** If the dataset reflects trends that align with historically popular genres (e.g., pop, rock), the model might reinforce these preferences. It may fail to give a fair chance to newer, diverse genres or non-mainstream musical styles.
+     - **Mitigation:** Actively seek to balance the dataset by including emerging genres or lesser-known artists, ensuring that historical popularity does not overshadow newer or niche music styles.
+
+   - **Feature Bias:**
+     - **Concern:** Features like "valence" (musical positivity) and "energy" (dynamism) may be correlated with certain demographics or cultural trends, potentially embedding implicit biases. For example, certain cultures or regions may prefer high-energy tracks, which could affect the model’s predictions of track popularity.
+     - **Mitigation:** Carefully assess whether any features in the dataset could be indirectly reinforcing cultural or demographic biases. Consider normalizing or standardizing features to reduce the impact of potentially biased data.
+
+#### **2. Possible Risks or Societal Implications**
+
+   - **Discrimination:**
+     - **Concern:** If the model disproportionately favors tracks from particular artists, genres, or cultures, it could marginalize certain groups of listeners or artists. This would perpetuate the dominance of certain musical forms, excluding others from visibility or recognition.
+     - **Impact:** Listeners from underrepresented groups may feel excluded, and artists from less popular genres may struggle to gain traction.
+     - **Mitigation:** The model should be evaluated for fairness by testing its predictions across different genres, languages, and listener demographics. Incorporating diversity and inclusion into the recommendation process can mitigate such risks.
+
+   - **Privacy:**
+     - **Concern:** The dataset includes information on listener preferences, which could involve sensitive data. If not handled correctly, this data could lead to privacy breaches, particularly if it includes identifiable user behaviors or demographic information.
+     - **Impact:** If privacy safeguards are not in place, users could unknowingly provide consent to share personal preferences, leading to a breach of trust in music platforms.
+     - **Mitigation:** Ensure compliance with privacy regulations such as GDPR when using listener data. Consider anonymizing user behavior data and minimizing the collection of personally identifiable information.
+
+   - **Transparency and Accountability:**
+     - **Concern:** If the model that recommends tracks is opaque and the decision-making process is not transparent, users may not understand why certain songs are recommended to them. This could erode trust in music recommendation systems.
+     - **Impact:** Users may feel alienated if they don’t understand why certain tracks are being suggested, especially if recommendations are perceived as biased or irrelevant.
+     - **Mitigation:** Build explainable models that provide insights into why certain tracks are recommended based on user behavior, genre preferences, and audio features like energy or tempo.
+
+#### **3. Crucial Issues Which Might Not Be Measurable**
+
+   - **Unobserved Variables:**
+     - **Concern:** Certain aspects of musical success—like cultural impact, personal connection to songs, or intangible emotional factors—cannot be quantified easily. These factors may significantly influence the popularity of a track but are hard to measure.
+     - **Impact:** Without considering these unobserved variables, the model might miss important reasons why certain tracks resonate with audiences, leading to inaccurate recommendations.
+     - **Mitigation:** While it is difficult to include such intangible factors in the model, incorporating user feedback or sentiment analysis on social media could help capture some of these emotional dimensions indirectly.
+
+   - **Model Assumptions:**
+     - **Concern:** Many models, including linear regression, assume that the relationships between features (like energy and popularity) are linear. In reality, music trends are often more complex and non-linear (e.g., small variations in tempo could have large effects on popularity in some genres).
+     - **Impact:** If these assumptions are not checked, the model might give incorrect predictions, especially for less mainstream or emerging tracks that deviate from established patterns.
+     - **Mitigation:** Test for non-linearity in relationships between features and target variables. Consider using more flexible models like decision trees or neural networks that can capture complex relationships more effectively.
+
+#### **4. Who Is Affected and How Does That Affect Your Critique?**
+
+   - **Artists:**
+     - **Impact:** If the model heavily favors certain types of music or popular artists, lesser-known artists might struggle to gain visibility, potentially limiting their reach and income. Additionally, models may unintentionally reinforce stereotypes by only recommending certain genres or artist types.
+     - **Consideration:** Ensure the model is not biased towards particular types of music and includes diverse artists from various genres, backgrounds, and regions.
+
+   - **Listeners:**
+     - **Impact:** If the model’s recommendations are not diverse enough, users may be exposed to a narrow range of music, which limits their discovery of new genres or artists. This could lead to a more homogenized listening experience.
+     - **Consideration:** Critique the model’s recommendation process to ensure that listeners are exposed to a wide variety of music and are not pigeonholed into predictable preferences based on overly narrow features.
+
+   - **Music Streaming Platforms:**
+     - **Impact:** Platforms like Spotify depend on accurate and fair models for recommending music to users. If models are biased or flawed, platforms could lose user trust or face reputational damage.
+     - **Consideration:** Ensure that the model is not only technically sound but also aligned with the platform’s values of fairness and diversity.
+
+#### **5. Evaluation Metrics and Practical Use**
+
+   - **Standard Metrics:**
+     - **Concern:** Metrics like accuracy and RMSE are commonly used to evaluate model performance but may not fully capture the user experience or fairness of the recommendations.
+     - **Impact:** These metrics could overlook practical shortcomings such as bias towards certain genres or artists, which might not be apparent in traditional evaluation metrics.
+     - **Mitigation:** In addition to accuracy and RMSE, use diversity metrics, fairness metrics (e.g., demographic parity), and user engagement metrics to better understand how the model performs in real-world scenarios.
+
+#### **6. Conclusion**
+
+When analyzing the Spotify dataset, ethical and epistemological concerns must be at the forefront of model development. These include addressing potential biases in data and features, considering the societal impact of model recommendations, and recognizing the limitations of the model and the data. To build a model that is both **technically robust** and **ethically sound**, we need to:
+
+- Actively seek and correct biases in the dataset and feature selection.
+- Ensure the model is transparent and fair, providing users with explanations of why certain recommendations are made.
+- Acknowledge and mitigate the impact of unmeasurable variables, striving to incorporate diverse viewpoints into the analysis.
+- Regularly evaluate and monitor the model to ensure it remains inclusive and unbiased as trends evolve.
+
+By considering these ethical and epistemological perspectives, we can create a more inclusive, responsible, and trustworthy music recommendation system that benefits both users and artists alike.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

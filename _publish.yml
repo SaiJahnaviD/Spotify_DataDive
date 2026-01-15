@@ -1,0 +1,4 @@
+- source: project
+  quarto-pub:
+    - id: 901a4cf9-ed74-4fa5-84ad-8afafc80001c
+      url: https://dsj.quarto.pub/r_datadive

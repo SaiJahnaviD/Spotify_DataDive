@@ -1,0 +1,224 @@
+---
+title: "Week-4"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(conflicted)
+```
+### Selecting Data
+```{r}
+#Reading the data set and printing first 5rows
+data <- read.csv("dataset.csv")
+
+conflicted::conflicts_prefer(dplyr::filter)
+
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+nrow(data)
+
+# Display first few rows
+head(data)
+```
+### Making Random Subsamples
+```{r}
+# Determine sample size (50% of data) from 9000 rows
+sample_size <- min(9000, round(nrow(data) * 0.5))
+
+# Create 5 random samples with replacement
+df_1 <- data |> sample_n(sample_size, replace = TRUE)
+df_2 <- data |> sample_n(sample_size, replace = TRUE)
+df_3 <- data |> sample_n(sample_size, replace = TRUE)
+df_4 <- data |> sample_n(sample_size, replace = TRUE)
+df_5 <- data |> sample_n(sample_size, replace = TRUE)
+
+# Verify
+dim(df_1); dim(df_2); dim(df_3); dim(df_4); dim(df_5)
+```
+### Summarising df_1
+```{r}
+df_1 |> 
+  group_by(track_genre) |> 
+  summarise(
+    count = n(),
+    avg_popularity = mean(popularity, na.rm = TRUE),
+    avg_danceability = mean(danceability, na.rm = TRUE),
+    avg_energy = mean(energy, na.rm = TRUE),
+    avg_acousticness = mean(acousticness, na.rm = TRUE),
+    mode_key = names(sort(table(key), decreasing = TRUE))[1]
+  ) |> 
+  arrange(desc(avg_popularity))
+```
+### Summarisng df_2
+```{r}
+df_2 |> 
+  group_by(track_genre) |> 
+  summarise(
+    count = n(),
+    avg_popularity = mean(popularity, na.rm = TRUE),
+    avg_danceability = mean(danceability, na.rm = TRUE),
+    avg_energy = mean(energy, na.rm = TRUE),
+    avg_acousticness = mean(acousticness, na.rm = TRUE),
+    mode_key = names(sort(table(key), decreasing = TRUE)[1])
+  ) |> 
+  arrange(desc(avg_popularity))
+```
+### Summarising df_3
+```{r}
+df_3 |> 
+  group_by(track_genre) |> 
+  summarise(
+    count = n(),
+    avg_popularity = mean(popularity, na.rm = TRUE),
+    avg_danceability = mean(danceability, na.rm = TRUE),
+    avg_energy = mean(energy, na.rm = TRUE),
+    avg_acousticness = mean(acousticness, na.rm = TRUE),
+    mode_key = names(sort(table(key), decreasing = TRUE)[1])
+  ) |> 
+  arrange(desc(avg_popularity))
+```
+### Summarising df_4
+```{r}
+df_4 |> 
+  group_by(track_genre) |> 
+  summarise(
+    count = n(),
+    avg_popularity = mean(popularity, na.rm = TRUE),
+    avg_danceability = mean(danceability, na.rm = TRUE),
+    avg_energy = mean(energy, na.rm = TRUE),
+    avg_acousticness = mean(acousticness, na.rm = TRUE),
+    mode_key = names(sort(table(key), decreasing = TRUE)[1])
+  ) |> 
+  arrange(desc(avg_popularity))
+```
+### Summarising df_5
+```{r}
+df_5 |> 
+  group_by(track_genre) |> 
+  summarise(
+    count = n(),
+    avg_popularity = mean(popularity, na.rm = TRUE),
+    avg_danceability = mean(danceability, na.rm = TRUE),
+    avg_energy = mean(energy, na.rm = TRUE),
+    avg_acousticness = mean(acousticness, na.rm = TRUE),
+    mode_key = names(sort(table(key), decreasing = TRUE)[1])
+  ) |> 
+  arrange(desc(avg_popularity))
+```
+### Summarising all dfs as a list using ''lapply'
+```{r}
+# Summarising using lapply
+#lapply(list(df_1, df_2, df_3, df_4, df_5), summary)
+
+dfs <- list(df_1, df_2, df_3, df_4, df_5)
+
+# Apply summarization to each dataframe in the list
+summarized_dfs <- lapply(dfs, function(df) {
+  df |> 
+    group_by(track_genre) |> 
+    summarise(
+      count = n(),
+      avg_popularity = mean(popularity, na.rm = TRUE),
+      avg_danceability = mean(danceability, na.rm = TRUE),
+      avg_energy = mean(energy, na.rm = TRUE),
+      avg_acousticness = mean(acousticness, na.rm = TRUE),
+      mode_key = names(sort(table(key), decreasing = TRUE)[1])
+    ) |> 
+    arrange(desc(avg_popularity))
+})
+
+# To view the summarized dataframes
+summarized_dfs
+```
+
+### 1. **How different are they?**
+   For comparing **random sub-samples** of tracks,
+   
+   - **Popularity:** Tracks with higher popularity (popularity score of 80 or more) are having higher **energy**, **danceability**, and **loudness** values. In contrast, less popular tracks are having lower values in these features.
+   
+   - **Genre-Based Differences:** Acoustic tracks have lower **energy** and **danceability**, with higher **acousticness** and **instrumentalness** compared to electronic or pop genres.
+   
+
+### 2. **What would you have called an anomaly in one sub-sample that you wouldn't in another?**
+   For this dataset, anomalies vary across sub-samples like:
+   
+   - A track with a popularity score of 50 or below is an anomaly in a sub-sample of tracks with popularity mostly above 70. Conversely, in a sub-sample with mostly low-popularity tracks, a track with popularity over 70 is unusual.
+   
+   - A track with exceptionally low energy (e.g., below 0.2) is an anomaly in a sub-sample focused on energetic genres like pop or EDM, but normal in a sub-sample of classical or acoustic music.
+   
+   - In Duration (ms): A track that is significantly longer (e.g., over 7 minutes) is an anomaly in a typical 3-4 minute pop/rock sub-sample but not unusual in a classical or ambient sub-sample.
+
+### 3. **Are there aspects of the data that are consistent among all sub-samples?**
+   - **Common Features Across Sub-samples:**
+     - From the dfs, **Tempo** is fairly consistent across most tracks, though certain genres like electronic or dance are having higher tempos. In all sub-samples, there is likely to be a wide range of **valence** (mood), **danceability**, and **loudness**, reflecting the diversity in music styles.
+     - **Key** and **mode** values (musical key and scale) are relatively consistent within certain genres (e.g., pop tracks will likely have more common modes and keys).
+     - **Time signature** staying the same (mostly 4/4 time) across a large number of tracks, though genres like jazz or classical might feature a broader range of signatures.
+     
+### Conclusion
+Analysing subsample summaries on the spotify dataset by grouping data based on probability. We got to know the key findings of the spotify dataset using subsamples and the summarization operation grouped the data by track_genre and calculated several summary statistics, including the count of records, average values for features like popularity, danceability, energy, and acousticness, as well as the most frequent key for each genre.
+
+In the future, this experience suggests that it's important to:
+1. **Examine sampling methods** carefully to ensure that both categorical and numeric variables are appropriately represented.
+2. **Use stratified sampling** or ensure a balanced representation of categories if we're working with imbalanced datasets or when certain groups are crucial for the analysis.
+3. **Consider the context of missing variables** when interpreting results—if a certain category is underrepresented, it might skew results or lead to faulty conclusions about the relationships within the data.
+
+     
+### Monte Carlo Simulation 
+```{r}
+# Number of simulations
+num_simulations <- 1000
+
+# Store results of each simulation
+results <- vector("list", num_simulations)
+
+# Simulation process
+for (i in 1:num_simulations) {
+  # Randomly sample from the dataset
+  sampled_data <- df_1[sample(nrow(df_1), size = nrow(df_1), replace = TRUE), ]
+  
+  # Count categorical and numeric variables in the sampled data
+  cat_count <- sum(sapply(sampled_data, is.factor))
+  num_count <- sum(sapply(sampled_data, is.numeric))
+  
+  # Store the results
+  results[[i]] <- list(cat_count = cat_count, num_count = num_count)
+}
+
+# Convert results into a dataframe for easier analysis
+simulation_results <- bind_rows(results)
+
+# Summarize how often categorical variables appear across all simulations
+cat_appearance_rate <- mean(simulation_results$cat_count > 0)
+
+# Check the distribution of numeric vs categorical counts
+table(simulation_results$cat_count > 0)
+```
+
+```{r}
+# Print the appearance rate of categorical variables
+print(paste("Rate of Categorical Variables in Subsamples:", cat_appearance_rate))
+```
+
+
+
+
+
+Explanation:
+TRUE: This indicates that in each of the 1,000 simulations, at least one categorical variable was present in the subsample. So, in every random subsample, there was at least one categorical variable included.
+
+1000: This is simply showing that we ran 1,000 simulations, which aligns with the number of iterations in the Monte Carlo simulation.
+
+Rate of Categorical Variables in Subsamples: 1: This means that in all 1,000 subsamples, categorical variables are present. The rate of 1 signifies that categorical variables were always included in the subsamples. So, there was no case where categorical variables were completely missing in any of the simulations.
+
+Conclusions:
+Categorical Variables are Always Represented: The subsampling strategy, as set up, always includes categorical variables. This suggests that, under the conditions of your simulation (sample size, replacement), our random sampling procedure consistently includes categorical variables.
+
+No Missing Categories: The fact that the rate is 1 implies that in our subsampling approach, categorical variables are always present, which is a positive finding. It means we don’t need to worry about missing out on categorical variables under the current setup.
+
+Next Steps:
+I could expand the simulation to track how often different categories appear and explore if some categories are more prone to being sampled over others.

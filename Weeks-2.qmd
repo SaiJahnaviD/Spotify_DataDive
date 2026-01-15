@@ -1,0 +1,277 @@
+---
+title: "Week-2"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(conflicted)
+```
+
+```{r}
+install.packages("skimr")
+library(skimr)
+
+```
+
+
+
+
+
+```{r}
+#Reading the data set and printing first 5rows
+data <- read.csv("dataset.csv")
+head(data)
+```
+
+```{r}
+# Display column names and types
+str(data)
+typeof(data)
+
+#Verify
+class(data)
+```
+
+The str() function shows the structure of the data (column names and types), while typeof() and class() provide additional type details of the entire dataset.
+
+```{r}
+conflicted::conflicts_prefer(dplyr::filter)
+
+# Filter dataset where explicit is "True" and sample 10,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+nrow(data)
+
+# Display first few rows
+head(data)
+```
+
+
+### Calculating summary statistics for popularity and danceability, including: Min/Max, Mean, Median, Quartiles, Standard deviations
+
+```{r}
+# 1. Numeric Summary for Columns - popularity and danceability
+
+# Summary statistics using summary()
+print("Summary statistics for 'popularity' and 'danceability':")
+print(summary(data[c("popularity", "danceability")]))
+
+# Quartiles for popularity
+print("Quartiles for popularity:")
+print(quantile(data$popularity, probs = seq(0, 1, 0.25)))
+
+# Quartiles for danceability
+print("Quartiles for danceability:")
+print(quantile(data$danceability, probs = seq(0, 1, 0.25)))
+
+# Standard deviation for both columns
+print("Standard deviation of popularity:")
+print(sd(data$popularity))
+
+print("Standard deviation of danceability:")
+print(sd(data$danceability))
+```
+### Using summarise() from dplyr to create a numeric summary for popularity and duration_ms
+
+```{r}
+# Numeric summary for two columns: popularity and duration_ms
+summary(data$popularity)
+summary(data$duration_ms)
+
+data |>
+  summarise(
+    popularity_min = min(popularity, na.rm = TRUE),
+    popularity_max = max(popularity, na.rm = TRUE),
+    popularity_mean = mean(popularity, na.rm = TRUE),
+    popularity_median = median(popularity, na.rm = TRUE),
+    popularity_quantiles = quantile(popularity, probs = c(0.25, 0.5, 0.75), na.rm = TRUE),
+    duration_min = min(duration_ms, na.rm = TRUE),
+    duration_max = max(duration_ms, na.rm = TRUE),
+    duration_mean = mean(duration_ms, na.rm = TRUE),
+    duration_median = median(duration_ms, na.rm = TRUE),
+    duration_quantiles = quantile(duration_ms, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+  )
+```
+
+```{r}
+# 2. Categorical Summary (Unique Values & Counts)
+
+# Count unique values in categorical columns
+print("Number of unique values in 'track_genre' and 'explicit':")
+print(sapply(data[c("track_genre", "explicit")], function(x) length(unique(x))))
+
+# Frequency counts of each category in 'track_genre'
+print("Frequency count of track genres:")
+print(table(data$track_genre))
+
+# Sorted frequency count of 'track_genre' in decreasing order
+print("Sorted count of track genres (most common first):")
+print(sort(table(data$track_genre), decreasing = TRUE))
+
+# Frequency count of explicit (True/False)
+print("Frequency count of explicit (True/False):")
+print(table(data$explicit))
+```
+
+```{r}
+# Function to show unique values and their counts for a categorical column
+unique_values <- function(col) {
+  # Create a frequency table
+  freq_table <- table(col)
+  # Convert the table into a data frame with 'Value' and 'Count'
+  data.frame(
+    Value = names(freq_table),
+    Count.Freq = as.integer(freq_table)
+  )
+}
+
+# Example usage for a categorical column like 'track_genre'
+unique_values(data$track_genre)
+# Example for multiple columns
+unique_values(data$explicit)
+unique_values(data$track_genre)
+```
+
+Combined Summary: This combines a numeric summary and a categorical summary (unique values) in one concise table.
+
+```{r}
+# 3. Combined Summary Using dplyr
+summary_data <- data |>
+  summarise(
+    min_popularity = min(popularity),
+    max_popularity = max(popularity),
+    mean_popularity = mean(popularity),
+    median_popularity = median(popularity),
+    sd_popularity = sd(popularity),
+    min_danceability = min(danceability),
+    max_danceability = max(danceability),
+    mean_danceability = mean(danceability),
+    median_danceability = median(danceability),
+    sd_danceability = sd(danceability),
+    unique_genres = length(unique(track_genre)),
+    unique_explicit = length(unique(explicit))
+  )
+print("Combined summary of numeric and categorical data:")
+print(summary_data)
+```
+### 'skimr' provides an enhanced summary of the dataset, including the distribution and missing values
+
+```{r}
+print("Detailed summary using skimr:")
+print(skim(data))
+```
+
+### Set of At Least 3 Novel Questions to Investigate:
+
+1.  Does the popularity of songs vary significantly across genres?
+
+2.  How does the duration of a song correlate with its popularity?
+
+3.  Is there any connection between a song’s explicit content and its popularity or genre?
+
+4.  Do explicit songs tend to have higher or lower popularity?
+
+5.  How does the popularity of songs vary based on whether they are explicit or not?
+
+6.  Do songs with longer durations have higher or lower popularity?
+
+7.  Is there a trend in song popularity across different genres?
+
+### Investigating Question using Aggregation 
+```{r}
+#Question 1: Does Popularity Vary by Genre?
+
+# Aggregate popularity by genre
+agg_genre <- data      |>
+  group_by(track_genre) |>
+  summarise(mean_popularity = mean(popularity, na.rm = TRUE))
+
+print(agg_genre)
+```
+
+
+### Explanation: 
+This aggregation finds the mean popularity for each genre. 
+
+### Insight: 
+The aggregated table will reveal if some genres are more popular on average. This insight can inform marketing strategies or targeted content creation. 
+
+### Significance: 
+If certain genres consistently have higher popularity scores, it may suggest genre preferences or trends that can be leveraged for recommendations or advertising. 
+
+### Further Question: 
+How do the distribution patterns compare for each genre?
+
+
+### Data Visualization
+
+```{r}
+#Visualization 1: Distribution of Popularity (Histogram)
+
+ggplot(data, aes(x = popularity)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.7) +
+  labs(title = "Distribution of Popularity", x = "Popularity", y = "Count")
+```
+### Explanation: 
+The histogram shows the distribution of popularity scores across songs. 
+
+### Insight: 
+From the histogram, we can observe if popularity scores are normally distributed or if they are skewed towards higher or lower values.
+
+### Significance: 
+1. The histogram shows a right skew (more songs with lower popularity), it suggests that only a few songs reach high popularity. This could be useful for modeling popularity prediction. 
+
+### Further Question: 
+Are there significant peaks in the popularity distribution that could indicate genre-specific trends?
+
+```{r}
+#Visualization:2 Scatterplot using Energy and Loundness
+
+ggplot(sample_data, aes(x = energy, y = loudness)) +
+  geom_point(alpha = 0.5, color = "green") +
+  labs(title = "Energy vs Loudness", x = "Energy", y = "Loudness (dB)") +
+  theme_minimal()
+```
+
+### Explanation:
+This scatter plot explores the relationship between a song’s energy and its loudness.
+
+### Insights:
+1. A strong positive correlation suggests that louder tracks tend to have higher energy.
+2. If points are scattered without a clear trend, it implies that loudness and energy are independent.
+3. Outliers in the high-energy, low-loudness region could indicate high-energy but soft acoustic tracks.
+
+### Significance:
+Understanding this relationship helps identify how music production techniques influence perception—high-energy tracks with low loudness could be a unique characteristic of certain genres.
+
+### Further Questions:
+1. Are there specific genres that break the typical loudness-energy relationship?
+2. Does explicit content correlate with louder and more energetic songs?
+
+```{r}
+# Visualisation: 3 Density plot of Acousticness
+
+ggplot(sample_data, aes(x = acousticness)) +
+  geom_density(fill = "purple", alpha = 0.5) +
+  labs(title = "Density Plot of Acousticness", x = "Acousticness", y = "Density") +
+  theme_minimal()
+```
+
+### Explanation:
+This density plot shows the probability distribution of acousticness values in the dataset.
+
+### Insights:
+A peak near 0 indicates many tracks are highly acoustic.
+A bimodal or multimodal distribution suggests there are distinct clusters of acoustic and non-acoustic tracks.
+A left-skewed distribution means most tracks are electronic or heavily processed.
+
+### Significance:
+Acousticness is an important factor in determining whether a song is more organic or digitally produced.
+
+### Further Questions:
+Do explicit tracks tend to have lower acousticness compared to clean tracks?
+How does acousticness relate to energy and tempo?

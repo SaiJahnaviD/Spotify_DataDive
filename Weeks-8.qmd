@@ -1,0 +1,215 @@
+---
+title: "Week-8"
+output: html_notebook
+---
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(conflicted)
+library(pwr)   # For power analysis
+library(boot)  # For bootstrapping
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+# Select a continuous (or ordered integer) column of data that seems most "valuable" given the context of your data, and call this your response variable.
+
+```{r}
+# Summary statistics for popularity
+summary(data$popularity)
+
+# Check unique values to confirm it's numeric/ordered
+unique(data$popularity)
+
+```
+
+
+The minimum popularity score is 0, and the maximum is 98, indicating a wide range.
+The median (38.0) and mean (36.5) suggest a slightly right-skewed distribution.
+The first quartile (Q1 = 20.0) and third quartile (Q3 = 56.0) indicate that 50% of the tracks have popularity scores between these values.
+
+The unique(data$popularity) function confirms that popularity is an ordered numeric variable.
+The presence of values across the full range (0–98) suggests that popularity is not categorical but a continuous (or ordinal integer) variable.
+
+# Visual - 1
+```{r}
+# Histogram of Popularity
+ggplot(data, aes(x = popularity)) +
+  geom_histogram(binwidth = 5, fill = "blue", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Distribution of Track Popularity", x = "Popularity", y = "Count")
+```
+From the graph, 
+1. Many tracks have **0 popularity**, indicating low or no engagement, possibly due to niche artists or newly added songs.  
+2. The distribution is **right-skewed**, with most songs having moderate popularity (10-50) and only a few reaching high popularity.  
+3. A **bimodal trend** is observed, with peaks at **0 and 25-30 popularity**, suggesting two distinct groups of songs.  
+4. Popularity **declines gradually** beyond 50, showing that **mainstream success is rare and highly competitive**.
+
+
+
+# Checking how popularity correlates with other numerical features.
+```{r}
+# Select numeric columns only
+numeric_data <- data %>% select_if(is.numeric)
+
+# Compute correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs")
+
+# Show correlation of popularity with other features
+cor_matrix["popularity", ]
+```
+
+Popularity has **no strong correlation** with any numerical feature, though **speechiness (-0.117) and liveness (-0.121) show slight negative effects**, while **danceability (0.044) and energy (0.044) have weak positive impacts**. 
+
+
+# Visual - 2
+```{r}
+ggplot(data, aes(x = danceability, y = popularity)) +
+  geom_point(alpha = 0.5, color = "red") +
+  theme_minimal() +
+  labs(title = "Danceability vs Popularity", x = "Danceability", y = "Popularity")
+```
+The scatter plot shows a **weak positive correlation** between danceability and popularity, meaning tracks with higher danceability **tend to be more popular** but not strongly. The points are widely dispersed, suggesting **popularity is influenced by multiple factors** beyond danceability. 
+
+# Select a categorical column of data (explanatory variable) that you expect might influence the response variable.
+
+We need a categorical variable that might influence popularity. A good choice is "key" (musical key of the track), since different musical keys might affect listener preferences.
+```{r}
+
+# Check unique values in the key column
+unique(data$key)
+
+# Count occurrences of each key to ensure we have enough data
+table(data$key)
+
+# If too many categories, consolidate into Major and Minor keys
+data$key_grouped <- ifelse(data$mode == 1, "Major", "Minor")
+
+# Check the new grouping
+table(data$key_grouped)
+
+```
+
+The **musical key** is a good categorical variable to analyze its impact on popularity. Since there are **12 distinct keys**, we can simplify by grouping them into **Major and Minor** using the `mode` column. The dataset has **5,210 Major key tracks** and **3,790 Minor key tracks**, ensuring enough data for comparison. Analyzing popularity across these groups can reveal if **listeners prefer certain keys more**.
+
+# Devise a null hypothesis for an ANOVA test given this situation. Test this hypothesis using ANOVA, and summarize your results (e.g., use box plots). Be clear about how the R output relates to your conclusions.
+
+```{r}
+
+```
+
+For an ANOVA test, we compare means of popularity across different keys.
+
+```{r}
+# Run ANOVA test
+anova_result <- aov(popularity ~ key_grouped, data = data)
+
+# Print ANOVA summary
+summary(anova_result)
+```
+- **Null Hypothesis (H₀)**: The mean popularity of tracks does **not** significantly differ between Major and Minor keys.  
+- **Alternative Hypothesis (H₁)**: There **is** a significant difference in popularity between Major and Minor keys.  
+
+The **ANOVA test output** shows an F-value of **3.674** with a p-value of **0.0553**. Since **p > 0.05**, we fail to reject H₀, meaning **there is no strong evidence that key type (Major vs. Minor) influences popularity significantly**. However, since the p-value is close to 0.05, there might be a weak trend worth further exploration.
+
+
+### Interpretation of ANOVA Results:  
+The ANOVA test evaluates whether there is a significant difference in **popularity** between **Major and Minor keys**. The **p-value of 0.0864** is above the conventional **5% significance level** but below **10%**, indicating weak evidence of an effect.  
+
+### Conclusion:  
+Since the **p-value is greater than 0.05**, there is **no strong statistical evidence** that key type (Major or Minor) influences a track's popularity. However, at a **10% significance level**, the results suggest a slight trend, though not conclusive. Key type alone does not appear to be a major factor in determining a song’s popularity. Other elements, such as **genre, lyrics, tempo, or artist recognition**, likely have a stronger influence on listener preferences.
+
+```{r}
+# Box plot of Popularity vs Key Type
+ggplot(data, aes(x = key_grouped, y = popularity, fill = key_grouped)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Popularity by Key Type", x = "Key Type", y = "Popularity") +
+  scale_fill_manual(values = c("Major" = "blue", "Minor" = "red"))
+```
+The **box plot** visualizes the distribution of **popularity scores** for songs in **Major (blue) and Minor (red) keys**. The median popularity is nearly the same for both groups, with a similar interquartile range and spread, indicating that **key type (Major or Minor) does not strongly influence popularity**.
+
+# Find a single continuous (or ordered integer, non-binary) column of data that might influence the response variable. Make sure the relationship between this variable and the response is roughly linear.
+
+```{r}
+# Check structure of danceability
+str(data$danceability)
+
+# Summary statistics
+summary(data$danceability)
+
+# Check correlation with popularity
+cor(data$popularity, data$danceability, use="complete.obs")
+```
+
+### **Interpretation of Analysis on Danceability and Popularity**
+
+- **Danceability** is a continuous variable ranging from **0.0647 to 0.9710**, with a median of **0.658**.
+- The **correlation between danceability and popularity** is **0.0437**, indicating a **very weak positive relationship**.
+- Since the correlation is close to **zero**, danceability **does not strongly influence popularity**, meaning higher danceability does not necessarily lead to more popular songs.
+
+
+Step 2: Check for Linearity
+Before fitting a linear regression model, we visualize the relationship.
+```{r}
+
+# Scatter plot with trend line
+ggplot(data, aes(x = danceability, y = popularity)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", col = "blue") +
+  theme_minimal() +
+  labs(title = "Danceability vs. Popularity",
+       x = "Danceability",
+       y = "Popularity")
+
+```
+
+### **Interpretation of the Scatter Plot: Danceability vs. Popularity**
+- Each **dot** represents a song, plotting its **danceability** (x-axis) against **popularity** (y-axis).  
+- The **blue line** represents the **linear trend** fitted using a regression model.  
+- The **line is nearly flat**, indicating a **very weak positive correlation**, which aligns with the calculated correlation of **0.0437**.  
+- The **spread of points** shows no clear linear pattern, suggesting **danceability is not a strong predictor of popularity**.
+
+
+```{r}
+# Fit the model
+lm_model <- lm(popularity ~ danceability, data = data)
+
+# Display model summary
+summary(lm_model)
+```
+
+The linear model shows that danceability has a small but statistically significant effect on popularity (\( p < 0.001 \)). However, the **R² value (0.00191)** is extremely low, meaning danceability explains **only 0.19% of the variation** in popularity. The coefficient (6.16) suggests that increasing danceability by 1 unit raises popularity by **6.16 points on average**. However, the **high residual standard error (24.27)** indicates large unexplained variability. This suggests that danceability alone is not a strong predictor, and other factors should be considered for better modeling.
+
+# Residual Analysis
+```{r}
+# Plot residuals to check model assumptions
+par(mfrow = c(2,2))
+plot(lm_model)
+```
+
+The residual analysis plots assess the assumptions of linear regression:  
+
+1. **Residuals vs Fitted**: Shows a **random scatter** around zero, but some clustering indicates potential non-linearity or heteroscedasticity.  
+2. **Q-Q Plot**: Residuals **deviate from the normal line**, suggesting **non-normality** in errors.  
+3. **Scale-Location**: Residuals appear **evenly spread**, but the slight upward trend suggests possible heteroscedasticity.  
+4. **Residuals vs Leverage**: No extreme leverage points, but a few observations may **influence the model**.  
+
+Overall, the plots indicate **violations of linear regression assumptions**, suggesting a more complex model might be needed.
+A multiple regression model with more features (e.g., tempo, energy, loudness, speechiness) is needed to better understand popularity.
+
+
+
+
+
+
+

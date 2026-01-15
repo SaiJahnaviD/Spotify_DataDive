@@ -1,0 +1,200 @@
+---
+title: "Week-5"
+output: html_notebook
+---
+```{r}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(conflicted)
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+```{r} 
+# Listing out all the column_names of the dataset
+names(data)
+```
+### 1. A list of at least 3 columns (or values) in your data which are unclear until you read the documentation.
+
+1. At first, by seeing the dataset, the column name X seems to be unknown.
+Later, after seeing values in it, I came to recognise it as the index.
+Also, again I wondered as 'track_id' can act as a unique identifier, but, after going through documentation, I found that track_id is unique id generated for each music track and X acts as an identifier of it in the dataset.It will be unclear whether this ID is unique for each track, reused across different versions, or linked to an external database.
+
+2. "mode" – The meaning of "mode" is unclear without refering to documentation. In music-related datasets, it refers to the musical mode (major(1) or minor(0)). This classification is based on Western music theory, where a major scale tends to sound positive, while a minor scale often conveys a more somber or emotional feel.
+0 → Minor mode (associated with darker, sadder, or more melancholic tones)
+1 → Major mode (associated with brighter, happier, or more uplifting tones)
+
+3. "valence" – This term isn't self-explanatory. In Spotify dataset, "valence" represents the musical positivity of a track.
+Valence values are decimals which ranges from 0 to 1 varying from sad to happy state. In simpler terms, valence quantifies the emotional tone of a song, with higher values indicating a more upbeat, joyful feel, and lower values indicating a more somber, introspective vibe.
+
+4. "Time_signature" - It's value is likely an integer that reflects one of these time signatures: 
+      4: Represents 4/4 time (most common in pop and rock music-meaning there are 4 beats per measure, and each beat is a quarter note)
+      3: Represents 3/4 time (waltz or certain classical music-typically found in waltzes, meaning there are 3 beats per measure, each                                a quarter note)
+      Other values (like 6 or 7) might appear but are less common.Often used in ballads or faster-paced tunes, meaning there are 6                                      beats per measure, and each beat is an eighth note.
+ 
+ 
+### Why do you think they chose to encode the data the way they did? What could have happened if you didn't read the documentation?
+
+The encoding choices in the music dataset, such as using binary values for **"mode"** (0 for minor, 1 for major), a **0-1 range for **"valence"** (emotional positivity), and integers for **"time_signature"**, are likely made to efficiently represent important musical attributes in a compact and meaningful way. These encodings allow for quick categorization and analysis, with **"mode"** distinguishing major and minor scales, **"valence"** capturing the emotional tone of the track, and **"time_signature"** reflecting the rhythmic structure of the song. 
+
+Without reading the documentation, however,one could easily misinterpret these features—such as assuming **"mode"** is an arbitrary number or misunderstanding **"valence"** as a technical feature. This could lead to confusion and incorrect analysis, emphasizing the importance of understanding the context behind the data to ensure accurate insights.
+
+### 2. At least one element or your data that is unclear even after reading the documentation.
+
+Even after reading the documentation of spotify dataset, one element of the data that might still remain unclear is the **"track_id"**. While it’s clear that this is an identifier for each track, the exact nature of this ID is ambiguous. For example, it is uncertain whether it is a globally unique identifier, if it’s linked to an external database, or if the same track might share the same ID in different contexts (such as different versions of a song or remixes). To clarify this, we need to explore the dataset further by checking for duplicates, cross-referencing with external sources like youtube music or music databases, or even analyzing the distribution and pattern of these IDs to understand their uniqueness and relevance.
+
+
+### 3. Build at least two visualizations which use a column of data that is affected by the issue you brought up in bullet #2, above. In these visualizations, find a way to highlight the issue from different perspectives, explain what is unclear, and why it might be concerning.
+
+```{r}
+# Creates a frequency table of track_ids
+track_id_count <- table(data$track_id)
+
+# Get the top 10 most frequent track_ids
+top_10_tracks <- head(sort(track_id_count, decreasing = TRUE), 10)
+
+# Creates a bar plot to visualize the top 10 most frequent track_ids
+top_10_plot <- ggplot(as.data.frame(top_10_tracks), aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  theme_minimal() +
+  labs(title = "Top 10 Most Frequent Track IDs", x = "Track ID", y = "Frequency") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+# Display the plot
+print(top_10_plot)
+```
+The top 10 **track_id** frequency plot can reveal repeated tracks, indicating possible duplicates or multiple versions of the same song. If certain **track_id** appear too often, it suggests data redundancy, which can skew analysis. This could also indicate a data quality issue, as **track_id** should ideally be unique. Addressing these repetitions through data cleaning would ensure more accurate insights.
+
+```{r}
+# Create a table of frequencies for mode (0 and 1)
+mode_count <- table(data$mode)
+
+# Create a pie chart to visualize the distribution of major (1) vs minor (0) tracks
+mode_plot <- ggplot(as.data.frame(mode_count), aes(x = "", y = Freq, fill = factor(Var1))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_manual(values = c("green", "orange")) +
+  labs(title = "Distribution of Mode (Major vs Minor)", fill = "Mode") +
+  theme_minimal()
+
+# Display the plot
+print(mode_plot)
+```
+The pie chart visually shows the distribution of **mode** values (0 for minor, 1 for major), highlighting how many tracks are in each category. If one category (minor or major) overwhelmingly dominates, it clarifies any potential imbalance in the dataset. The chart provides a clear overview of the mode feature, helping to ensure it's interpreted correctly. It also addresses any uncertainty about the proportion of songs in major vs minor modes.
+
+```{r}
+# Select relevant columns for the heatmap (danceability, energy, loudness, tempo, etc.)
+df_selected <- data[, c("danceability", "energy", "loudness", "tempo", "popularity")]
+
+# Calculate the correlation matrix for the selected columns
+correlation_matrix <- cor(df_selected, use = "complete.obs")
+
+# Create a heatmap to visualize the correlation between danceability and other features
+library(reshape2)
+library(ggplot2)
+library(RColorBrewer)
+
+# Melt the correlation matrix for ggplot2
+cor_melted <- melt(correlation_matrix)
+
+# Create a heatmap
+heatmap_plot <- ggplot(cor_melted, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0) +
+  theme_minimal() +
+  labs(title = "Correlation Heatmap for Danceability and Other Features",
+       x = "Feature", y = "Feature") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Display the plot
+print(heatmap_plot)
+
+```
+This heatmap helps clarify if the track_id represents meaningful variations in musical features or if there’s an overrepresentation of certain track_ids that might skew the dataset. 
+By aggregating values for each track, the heatmap can reveal patterns that indicate whether track_id is simply an identifier or if it plays a larger role in distinguishing track characteristics. 
+Since track_id likely represents different songs, we can use a heatmap to see if any track_id has distinct patterns across features such as popularity, energy, or danceability. 
+By aggregating values of other columns by track_id, we can observe if certain tracks dominate specific ranges of values.
+
+There seems certain risks and respective solutions for them -
+
+1. Risk: Overrepresentation of Certain Tracks
+   Solution: Ensure each track_id represents a unique song.
+2. Risk: Data Redundancy
+   Solution: Filter out redundant entries and aggregate data to represent each song only once.
+3. Risk: Inaccurate Aggregation of Multiple Versions
+   Solution: Carefully aggregate features by track_id, ensuring different versions of the same song are handled appropriately.
+4. Risk: Overfitting in Models
+   Solution: Use cross-validation techniques to ensure the model generalizes well and is not biased by repeated tracks.
+   
+   
+### 4. For at least two categorical columns, check for examples of the following, and describe what you find:
+### Are there explicitly missing rows?
+### Are there implicitly missing rows?
+### Are there empty groups?
+
+- Explicitly missing rows: Rows where the data is clearly marked as missing (e.g., empty cells, "N/A", or null values).
+- Implicitly missing rows: Rows that are not present in the dataset but should logically exist based on the context of other data.
+- Empty groups: Categories within a column that have no corresponding data entries.
+
+```{r}
+# Check for missing values (NA) in each column of the dataset
+missing_values <- sapply(data, function(x) sum(is.na(x)))
+
+# Display the count of missing values per column
+print(missing_values)
+```
+
+### a. Artists Column
+
+1. Name of the categorical column observed: artists
+
+2. Explicit missing rows: There are no explicitly missing rows in the artists column. All rows contain an artist name.
+
+3. Implicit missing rows: There don't appear to be any implicitly missing rows. The dataset seems to include a wide variety of artists    without any obvious omissions.
+
+4. Empty groups: There are no empty groups in the artists column. Each row has an associated artist.
+
+5. Additional observation: The artists column contains a mix of individual artists (e.g., "Gen Hoshino", "Jason Mraz") and collaborations (e.g., "Ingrid Michaelson; ZAYN").
+
+
+### b. Track Genre Column
+
+1. Name of the categorical column observed: track_genre
+
+2. Explicit missing rows: There are no explicitly missing rows in the track_genre column. All rows have a genre assigned.
+
+3. Implicit missing rows: There don't appear to be any implicitly missing rows in terms of genres. However, it's worth noting that all tracks in the visible data are labeled as "acoustic", which might suggest that other genres are implicitly missing from this dataset.
+
+4. Empty groups: There are no empty groups in the track_genre column. All rows have the genre "acoustic" assigned.
+
+5. Additional observation: The lack of variety in the track_genre column (all tracks labeled as "acoustic") might indicate that this dataset is focused specifically on acoustic tracks or that there's an issue with the genre classification in the data.
+
+
+### 5.For at least one continuous column, what would you define as an outlier and why?
+
+To analyze outliers in a continuous column, selecting 'popularity' column, which contains numerical values ranging from 0 to 82. 
+
+An outlier in the popularity column can be defined as a value that falls significantly outside the typical range of popularity scores for the tracks in this dataset.
+
+Here's how we can define outliers using the IQR method:
+Compute the Interquartile Range (IQR) = Q3 - Q1= 60 - 30 = 30
+Define the lower bound as Q1 - 1.5 * IQR = 30 - 1.5 * 30 = -15
+Define the upper bound as Q3 + 1.5 * IQR = 60 + 1.5 * 30 = 105
+
+Any value below the lower bound or above the upper bound is considered an outlier.
+Since popularity scores are always non-negative and have a maximum of 100, we can adjust our definition:
+Any popularity score below 0 (which isn't possible in this case) or above 105 would be considered an outlier.
+
+In this dataset, we don't see any values above 105, so there are no upper outliers. 
+However, tracks with very low popularity scores (close to 0) could be considered as lower outliers.
+

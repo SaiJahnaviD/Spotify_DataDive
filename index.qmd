@@ -1,0 +1,414 @@
+---
+title: "R_DataDive : Spotify_Tracks_Analysis"
+---
+
+In the project of analyzing Spotify Music Tracks, I performed an in-depth analysis of music track data to uncover trends and patterns related to track popularity, audio features, artist collaborations, and release timelines. Using R for data manipulation and visualization, I explored the distribution of track popularity across different genres and release years, investigated relationships between key audio features such as valence, energy, and danceability, and identified patterns in collaborative works among artists. 
+
+Aggregation techniques and summary statistics were applied to formulate and answer novel research questions, providing insights into how musical characteristics relate to audience engagement. I also handled data preprocessing tasks, including managing missing values and creating meaningful groupings for categorical variables to enhance the clarity of the analysis.
+
+Throughout the project, I focused on clear storytelling, combining statistical evidence with visual summaries to make the insights accessible to a broader audience. This analysis not only strengthened my skills in R programming, data visualization, and statistical interpretation but also demonstrated the practical application of exploratory data analysis (EDA) techniques to real-world music data.
+
+The project demonstrates data analysis skills and reflects my ability to derive actionable insights from complex datasets and present them in a user-friendly and impactful way.
+
+
+# Overview
+
+## 1. Introduction & Background
+
+**Context:** Spotify is a major platform that hosts millions of tracks with rich metadata and audio features.
+
+**Objective:** To explore factors influencing track popularity, genre characteristics, and artist collaborations.
+
+**Purpose:** To provide insights for content creators, playlist analysts, playlist designers, and music marketers.
+
+
+## 2. Addressing the Problem
+
+- The goal of this project is to analyze the Spotify music tracks dataset to uncover trends in song popularity, artist collaborations, and genre distribution. 
+
+- By examining relationships between audio features like valence and energy, the project seeks to identify key factors influencing track popularity. 
+
+- Additionally, the project includes creating visualizations to effectively present the insights. 
+
+- The analysis aims to provide actionable insights for music industry stakeholders to better understand audience preferences.
+
+
+## 3. Dataset Overview
+
+- This is a dataset of Spotify tracks over a range of 125 different genres. 
+- Each track has some audio features associated with it.
+- Collected from Kaggle.
+- Having 125,000 entries at the beginning, later sampled to 9000 entries based on a binary column data - explicit is "True“
+
+
+## 4. Dataset Column Names
+
+Important columns used in the dataset:
+
+track_id,
+artists,
+popularity,
+explicit,
+danceability,
+energy,
+loudness,
+mode,
+liveness,
+valence,
+tempo,
+time_signature,
+track_genre
+
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(conflicted)
+```
+
+
+```{r}
+#| include: false
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+### 4.1) Dataset Looks like...
+
+```{r}
+#| echo: false
+head(data)
+```
+
+
+
+## 5. Generalised Hypotheses in overall Data
+
+Here are the key hypotheses used in the Spotify music tracks dataset analysis:
+
+1. Tracks with higher energy tend to have higher popularity.
+Hypothesis: Energetic tracks are more engaging and thus more frequently streamed.
+
+2. Danceability and popularity are positively correlated.
+Hypothesis: Tracks that are easier to dance to are more likely to go viral or be added to playlists.
+
+3. Genre influences track popularity.
+Hypothesis: Some genres are more mainstream and favored by the broader Spotify audience.
+
+4. Combination of high valence and energy increases popularity. 
+Hypothesis: Positive and high-energy songs evoke stronger emotional responses, increasing shareability.
+ 
+5. Certain artist collaborations lead to higher popularity.
+Hypothesis: Collaborative tracks between popular artists attract wider audiences.
+
+
+## 6. Assumptions Made
+
+- Popularity scores (0-100) reflect listener engagement
+- Genre labels are sufficiently representative
+- Missing values have been removed without introducing bias
+
+These assumptions are essential to streamline the analysis and modeling. For instance, while Spotify's genre tags are vague, we treat them as meaningful categories. Also, popularity is assumed to reflect engagement reliably.
+
+- Assumed to cover a wide variety of tracks, making it statistically significant for general trends. Accepted due to the broad scope of the dataset.
+- Accepted as it directly correlates with user interactions on the platform.
+- Assumed that higher energy correlates with more intense, faster-paced tracks. Accepted based on established music theory and industry standards.
+
+
+## 7. Initial EDA and Visualizations
+
+### a) Distribution of Popularity (Histogram)
+
+```{r}
+ggplot(data, aes(x = popularity)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.7) +
+  labs(title = "Distribution of Popularity", x = "Popularity", y = "Count")
+```
+
+
+- Numeric Summaries of Key Columns- popularity, danceability
+- Insight: Popularity is right-skewed with most tracks falling below 60
+
+
+### b) How popularity is co-relating with danceability
+```{r}
+ggplot(data, aes(x = danceability, y = popularity)) +
+  geom_point(alpha = 0.5, color = "red") +
+  theme_minimal() +
+  labs(title = "Danceability vs Popularity", x = "Danceability", y = "Popularity")
+```
+
+
+
+- The scatter plot shows a weak positive correlation between danceability and popularity, meaning tracks with higher danceability tend to be more popular but not strongly. The points are widely dispersed, suggesting popularity is influenced by multiple factors beyond danceability. 
+
+- Danceability tends to be moderately high, indicating a general bias toward upbeat tracks.
+
+
+
+### c) Heatmap of considered factors with resultant variable: popularity
+
+```{r}
+# Select relevant columns for the heatmap (danceability, energy, loudness, tempo, etc.)
+df_selected <- data[, c("danceability", "energy", "loudness", "tempo", "popularity")]
+
+# Calculate the correlation matrix for the selected columns
+correlation_matrix <- cor(df_selected, use = "complete.obs")
+
+# Create a heatmap to visualize the correlation between danceability and other features
+library(reshape2)
+library(ggplot2)
+library(RColorBrewer)
+
+# Melt the correlation matrix for ggplot2
+cor_melted <- melt(correlation_matrix)
+
+# Create a heatmap
+heatmap_plot <- ggplot(cor_melted, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0) +
+  theme_minimal() +
+  labs(title = "Correlation Heatmap for Danceability and Other Features",
+       x = "Feature", y = "Feature") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Display the plot
+print(heatmap_plot)
+```
+
+
+
+- This correlation heatmap visualizes the relationships between five audio features: 'danceability', 'energy', 'loudness', 'tempo', and 'popularity’.
+
+- The color intensity indicates the strength of the correlation, with red representing strong positive correlation (near 1.0) and purple/white indicating weak or no correlation (near 0.0).
+
+- We observe a strong positive correlation between 'loudness' and 'energy’. 
+
+- ‘Danceability' shows moderate positive correlations with 'energy' and 'loudness', but a weak correlation (purple) with 'energy’.
+
+- 'Popularity' and 'tempo' generally exhibit weaker correlations with the other analyzed features.
+
+
+
+
+### d) Analysis of factors for Popularity
+
+```{r}
+
+# Select relevant audio features plus popularity
+df_selected <- data[, c("danceability", "energy", "loudness", "tempo", "popularity")]
+
+# Compute correlation matrix
+correlation_matrix <- cor(df_selected, use = "complete.obs")
+
+# Extract correlations of popularity with each feature
+df_cor <- as.data.frame(correlation_matrix["popularity", ]) %>%
+  tibble::rownames_to_column("feature") %>%
+  rename(correlation = `correlation_matrix["popularity", ]`) %>%
+  filter(feature != "popularity") %>%
+  arrange(abs(correlation))
+
+# Plot a horizontal bar chart of Pearson r values
+ggplot(df_cor, aes(x = reorder(feature, correlation), y = correlation)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Correlation of Popularity with Other Audio Features",
+    x = NULL,
+    y = "Pearson r"
+  ) +
+  theme_minimal()
+
+```
+
+
+
+The horizontal bar chart shows Pearson correlations between track popularity and four audio features. All effects are very weak (|r|≤0.15), but their signs and relative sizes are informative:
+
+- Energy (r ≈ –0.13) has the largest magnitude correlation: more energetic tracks tend to be slightly less popular.  
+- Loudness (r ≈ –0.05) also correlates negatively with popularity, implying that louder songs are marginally less favored by listeners in this dataset.
+- Tempo (r ≈ +0.03) shows a small positive association, suggesting faster‐paced tracks are a bit more likely to be popular.  
+- Danceability (r ≈ +0.05) has the strongest positive correlation of the four, indicating that higher “danceable” scores correspond with marginally higher popularity.  
+
+Taken together, these results imply that, within this sample, listeners' preference skews slightly toward moderately paced, danceable recordings rather than toward heavy, loud, high-energy production. 
+
+
+###  e) Hypothesis Exploration with Box-Plots
+
+```{r}
+# Create 'key_binary' column: classify key as 'Low' (0-5) or 'High' (6-11)
+data$key_binary <- ifelse(data$key <= 5, "Low", "High")
+
+# Convert to a factor for proper ordering
+data$key_binary <- factor(data$key_binary, levels = c("Low", "High"))
+
+
+ggplot(data, aes(x = key_binary, y = danceability, fill = key_binary)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Danceability Distribution by Key Type", x = "Key Type", y = "Danceability") +
+  theme_minimal()
+```
+
+
+
+
+The boxplot shows that Songs in high key types have a slightly higher median danceability (~0.68) compared to low key types (~0.65), indicating a minor positive effect of key type on danceability.
+
+### f)  Boxplot of tempo by energy category
+
+```{r}
+energy_threshold <- median(data$energy, na.rm = TRUE)
+data$energy_category <- ifelse(data$energy >= energy_threshold, "High Energy", "Low Energy")
+
+ggplot(data, aes(x = energy_category, y = tempo, fill = energy_category)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Tempo Distribution by Energy Level", x = "Energy Category", y = "Tempo") +
+  theme_minimal()
+```
+
+
+
+
+
+- The boxplot shows that high energy songs have a higher median tempo (~130 BPM) than low energy songs (~115 BPM), indicating a clear association between energy level and tempo.
+
+
+### g) Boxplot to explain relation between Popularity and Key Type
+```{r}
+# Box plot of Popularity vs Key Type
+data$key_grouped <- ifelse(data$mode == 1, "Major", "Minor")
+ggplot(data, aes(x = key_grouped, y = popularity, fill = key_grouped)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Popularity by Key Type", x = "Key Type", y = "Popularity") +
+  scale_fill_manual(values = c("Major" = "blue", "Minor" = "red"))
+```
+
+
+
+
+- The box plot visualizes the distribution of popularity scores for songs in Major (blue) and Minor (red) keys. The median popularity is nearly the same for both groups, with a similar interquartile range and spread, indicating that key type (Major or Minor) does not strongly influence popularity.
+
+
+### h) Violin Plot for Tempo Distribution
+```{r}
+ggplot(data, aes(x = energy_category, y = tempo, fill = energy_category)) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.1, color = "black", outlier.shape = NA) +
+  labs(title = "Tempo Distribution by Energy Level",
+       x = "Energy Category",
+       y = "Tempo (BPM)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("High Energy" = "#FF5733", "Low Energy" = "#3498DB")) +
+  theme(legend.position = "none")
+```
+
+
+
+
+- This violin plot explains that high energy songs have a higher median tempo (~130BPM) than low energy songs(~115 BPM) indicating that higher energy is associated with faster tempos.
+
+
+
+
+
+# 8. Regression Model
+
+##  8.1. Logistic Regression
+
+```{r}
+
+logit_model <- glm(mode ~ danceability + energy + tempo, data = data, family = binomial)
+
+# Display model summary
+summary(logit_model)
+
+# Display model coefficients
+coef(summary(logit_model))
+```
+
+
+
+
+- Danceability negatively affects mode, meaning more danceable songs are likely minor. 
+- Energy positively affects mode, meaning high-energy songs are more likely major. 
+- Tempo has no significant effect. 
+
+**Significance:** These findings suggest that dance-friendly songs tend to have minor tones, while high-energy songs are typically major, influencing music production and recommendation algorithms. 
+
+
+## 8.2. Linear Regression
+```{r}
+model <- lm(popularity ~ danceability + energy + acousticness + valence + tempo + loudness + duration_ms, data = data)
+summary(model)
+```
+
+- The model is statistically significant overall (F‐statistic = 31.02, p < 2.2e-16), but explains only about 2.36% of the variance in popularity (Adjusted R² = 0.0228).
+
+# 9. Key Findings:
+
+-   Majority of tracks have moderate popularity scores; very few tracks achieve extremely high popularity.
+
+-   Tracks with higher energy and danceability scores tend to have higher popularity on average.
+
+-   Positive correlations observed between valence (positiveness) and popularity for certain genres.
+
+-   Recent years show a significant increase in the number of popular tracks, indicating growing platform reach and changes in listener behavior.
+
+-   Certain genres like Pop and Hip-Hop dominate popularity charts, while niche genres maintain stable but lower popularity levels.
+
+-   Collaborative tracks (featuring multiple artists) tend to have slightly higher popularity scores compared to solo tracks.
+
+-   Energy and danceability features show a strong positive relationship across tracks, suggesting that energetic tracks are also more danceable.
+
+-   Valence (happiness) varies widely across popular tracks, indicating that both happy and melancholic songs can achieve high popularity.
+
+
+# Conclusion  
+
+From all the Data Dives and analysis, we can understand that Popularity of a song or a particular music track, depends on various factors like danceability, tempo, valence, energy and loudness.
+ 
+For instance, high danceability and energy often make a song more suitable for social settings and dance environments, increasing its chances of being played more frequently. 
+
+Similarly, valence, which measures the musical positivity of a track, can affect emotional appeal, while tempo and loudness contribute to the song’s overall intensity and mood. 
+
+
+**Future Recommendations:** To enrich user experience and musical diversity, it’s recommended that streaming platforms and creators should: 
+
+- Incorporate low-frequency groupings for music tracks with high genres.
+
+- Focusing on other factors like valence and energy.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,183 @@
+---
+title: "Week-3"
+output: html_notebook
+---
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(conflicted)
+library(skimr)
+```
+
+```{r}
+#Reading the data set and printing first 5rows
+data <- read.csv("dataset.csv")
+
+conflicted::conflicts_prefer(dplyr::filter)
+
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+nrow(data)
+
+# Display first few rows
+head(data)
+```
+### Step 1: Grouping Data and Analyzing Probabilities
+### Group 1: Grouping by Track Genre
+```{r}
+group1 <- data |> 
+  group_by(track_genre) |>
+  summarise(Count = n(), Mean_Popularity = mean(popularity, na.rm = TRUE))
+print(group1)
+```
+The genres with lower counts have a lower probability of occurrence in the dataset(black-metal).
+```{r}
+
+ggplot(group1, aes(x =reorder(track_genre, -Mean_Popularity), y = Mean_Popularity)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Mean Popularity by Track Genre",
+       x = "Track Genre",
+       y = "Mean Popularity") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5,size = 6),  
+    panel.grid.major.x = element_blank(),   # Remove vertical grid lines
+    plot.margin = margin(b = 100)           # Add bottom margin for labels
+  )
+```
+The graph shows a clear hierarchy in genre popularity, with the highest-rated genres reaching nearly 60 on the popularity scale while the lowest-rated genres fall below 10, demonstrating significant variation in listener preferences.
+
+### Group2: Grouping by Genre and Explicit Content
+```{r}
+group2 <- data |>
+  group_by(track_genre, explicit) |>
+  summarise(Count = n(), Median_Danceability = median(danceability, na.rm = TRUE))
+print(group2)
+```
+
+```{r}
+# Create faceted bar chart
+ggplot(group2, aes(x = reorder(track_genre, -Median_Danceability), 
+                   y = Median_Danceability,
+                   fill = explicit)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~explicit) +
+  scale_fill_manual(values = c( "True" = "coral")) +
+  labs(title = "Median Danceability by Genre and Explicit Content",
+       x = "Track Genre",
+       y = "Median Danceability",
+       fill = "Explicit") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90,
+                              hjust = 1, vjust = 0.5,
+                              size = 4),
+    legend.position = "none",
+    
+    panel.grid.major.x = element_blank(),
+    plot.margin = margin(b = 100) 
+  )
+```
+### By grouping and graph, we can know-
+
+Most genres have significantly more non-explicit tracks than explicit ones - for example, acoustic has 948 non-explicit vs only 52 explicit tracks, and ambient has 995 non-explicit tracks, showing a clear preference for clean content in these genres.
+
+Alternative music shows the highest proportion of explicit content (164 explicit tracks out of 1000) compared to other genres, while ambient and afrobeat have very few explicit tracks (less than 20 each).
+
+Danceability varies notably between explicit and non-explicit tracks within the same genre - for instance, alternative music shows higher danceability in explicit tracks (0.663) compared to non-explicit ones (0.538), while acoustic music shows the opposite trend with non-explicit tracks being more danceable (0.564 vs 0.491).
+
+### Group 3: Grouping by Binned Popularity Scores
+```{r}
+data <- data |> mutate(Popularity_Bin = cut(popularity, breaks = 5))
+group3 <- data |>
+  group_by(track_genre, Popularity_Bin) |>
+  summarise(Count = n())
+print(group3)
+```
+```{r}
+ggplot(group3, aes(x = Count, y = track_genre, fill = Popularity_Bin)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_brewer(palette = "RdYlBu") +
+  labs(title = "Distribution of Popularity Scores Across Music Genres",
+       x = "Number of Tracks",
+       y = "Genre") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 5,    # Increase text size
+                              margin = margin(r = 10)), # Add right margin
+    plot.margin = margin(r = 8),            # Add right margin for legend
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    panel.grid.major.y = element_blank() 
+  )
+```
+Popularity Distribution is Skewed: Most genres show a concentration of tracks in the middle popularity ranges (20-60), with very few tracks reaching the highest popularity bracket (80-100). For example, acoustic has only 1 track in the highest range but 518 tracks in the middle range (40-60).
+
+Genre-Specific Patterns: Different genres show distinct popularity patterns:
+
+Acoustic music has a bell-shaped distribution with most tracks in the middle ranges
+Afrobeat shows a left-skewed distribution with most tracks in lower popularity ranges (482 tracks in the lowest bracket)
+Alt-rock demonstrates a similar pattern to afrobeat with high counts in lower popularity ranges
+Extreme Popularity is Rare: Across all genres, very few tracks achieve the highest popularity bracket (80-100), suggesting that reaching top popularity is exceptionally challenging regardless of genre. The middle ranges (20-60) contain the bulk of tracks for most genres.
+
+### Step 2 : Investigating Combinations of Genre and Explicitness
+```{r}
+category_combinations <- data |> count(track_genre, explicit)
+print(category_combinations)
+```
+
+### Step 3 : Finding combinations
+```{r}
+# Find missing combinations
+all_combinations <- expand.grid(unique(data$track_genre), unique(data$explicit))
+missing_combinations <- anti_join(all_combinations, category_combinations, by = c("Var1" = "track_genre", "Var2" ="explicit"))
+print(missing_combinations)
+```
+
+```{r}
+# Most common combinations
+common_combinations <- group3 |>
+  group_by(track_genre, Popularity_Bin) |>
+  summarise(Count = n()) |>
+  arrange(desc(Count))
+
+# Least common combinations
+least_common_combinations <- group3 |>
+  group_by(track_genre, Popularity_Bin) |>
+  summarise(Count = n()) |>
+  arrange(Count)
+
+# Display the most common combinations
+print("Most common combinations:")
+head(common_combinations, 10)  # Views top 10 most common combinations
+
+# Display the least common combinations
+print("Least common combinations:")
+head(least_common_combinations, 10)  # Views top 10 least common combinations
+
+```
+From the least common and most common combinations, we can notice-
+1. Music genres like "acoustic," "afrobeat," and "alt-rock" are spread across multiple popularity bins.  
+2. The count distribution is relatively even across different popularity bins.  
+3. Some genres may perform better in higher popularity ranges, like "alt-rock."  
+4. Certain genres, like "acoustic" and "afrobeat," could appeal to niche audiences.
+
+
+### Summary:
+Grouping by different categorical variables reveals patterns in occurrence probabilities.
+The rarest groups can be identified and analyzed for anomalies.
+Missing genre-explicitness combinations hint at structured gaps in the dataset.
+Visualizations enhance interpretability and hypothesis testing.
+
+### Further Questions to Investigate-
+What factors contribute to the rarity of high-popularity tracks across all genres?
+
+Is there a temporal component affecting popularity distributions?
+
+How do other track features (danceability, energy) correlate with these popularity patterns?
+
+Are there regional or cultural factors influencing these distributions?

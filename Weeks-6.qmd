@@ -1,0 +1,237 @@
+---
+title: "Week-6"
+output: html_notebook
+---
+```{r}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(conflicted)
+```
+
+```{r}
+#Reading the data set
+data <- read.csv("dataset.csv")
+conflicted::conflicts_prefer(dplyr::filter)
+# Filtering dataset where explicit is "True" and taking a sample of 9,000 rows
+sample_data <- data |> filter(explicit == "True") |> sample_n(9000)
+data <- sample_data
+```
+
+```{r} 
+# Listing out all the column_names of the dataset
+names(data)
+```
+
+```{r}
+# Columns with continuous variables
+continuous_vars <- data[, sapply(data, is.numeric)]
+names(continuous_vars)
+```
+
+
+
+
+
+### 1. Choose two numeric variables, and pair each one with a column you built (i.e., calculated based on others)
+
+
+### Creating a new column1 "Beats Per Millisecond(beats)" : tempo/duration_ms
+```{r}
+# Creating a new column "Beats Per Millisecond(beats)" : tempo/duration_ms
+data$beats <- data$tempo / data$duration_ms
+sum(!is.na(data$beats))
+```
+
+### Creating a new column2 : Energy_Dance_Ratio = energy/danceability
+```{r}
+# Create the new column "Energy_Dance_Ratio"
+data$energy_dance_ratio <- data$energy / data$danceability
+sum(!is.na(data$energy_dance_ratio))
+```
+
+
+### Pair 1 (Response vs. Explanatory Variable) 
+
+Response Variable: beats (Beats Per Millisecond)
+
+Explanatory Variable: tempo (original column)
+
+Why?: beats is derived from tempo, and we analyze how tempo affects beats (explanatory -> response).
+
+### Pair 2 (Numeric Variables for Analysis) 
+
+Original Variable: energy
+
+Created Variable: energy_dance_ratio
+
+Why?: This helps explore whether energy correlates well with a track’s danceability.
+
+
+### Summarising Pairs
+```{r}
+# Summary of Pair 1
+summary(data[, c("tempo", "beats")])
+
+# Summary of Pair 2
+summary(data[, c("energy", "energy_dance_ratio")])
+
+```
+
+
+### 2. Plot a visualization for each relationship, and draw some conclusions based on the plots
+
+```{r}
+# Scatterplot for Pair 1 (beats vs. tempo)
+ggplot(data, aes(x = tempo, y = beats)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Beats Per Millisecond vs Tempo", x = "Tempo", y = "Beats Per Millisecond")
+```
+The graph shows a positive correlation between tempo and beats per millisecond, indicating that as the tempo of a track increases, the frequency of beats per millisecond also tends to rise.
+
+Graph 1: Tempo vs. Beats per Millisecond
+
+Strong positive correlation: There's a clear linear relationship between tempo and beats per millisecond, indicating a direct link between these two metrics.
+
+Data concentration: Most tracks cluster in the lower tempo and beats per millisecond range, suggesting that moderate-paced songs are more common in the dataset.
+
+Outlier potential: Any points significantly deviating from the trend line could represent interesting outliers, possibly indicating unique rhythmic structures or data anomalies.
+
+Genre insights: The distribution along this line could potentially be used to categorize or identify different music genres based on their tempo and beat frequency characteristics.
+
+```{r}
+# Scatterplot for Pair 2 (energy_dance_ratio vs. energy)
+ggplot(data, aes(x = energy, y = energy_dance_ratio)) +
+  geom_point(color = "green") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Energy-Dance Ratio vs Energy", x = "Energy", y = "Energy-Dance Ratio")
+```
+The graph shows a weak positive trend between energy and the energy-dance ratio, with higher energy tracks occasionally exhibiting extreme energy-dance ratio values.
+
+Graph 2: Energy vs. Energy-Dance Ratio
+
+Weak positive trend: There's a slight upward trend in the energy-dance ratio as energy increases, but the relationship is not strong or consistent.
+
+High variability: For any given energy level, there's a wide range of energy-dance ratios, indicating complex relationships between energy, danceability, and possibly other factors.
+
+Outliers at high energy: There are notable outliers with very high energy-dance ratios, particularly for tracks with high energy levels. These could represent unique or genre-defying tracks.
+
+Clustering patterns: The data points seem to form some vertical striping or clustering, which might indicate certain preferred or common combinations of energy and danceability in music production.
+
+
+
+
+### 3. Calculate the appropriate correlation coefficient for each of these combinations. Explain why the value makes sense (or doesn't) based on the visualization(s)
+
+```{r}
+# For Tempo vs. Beats per Millisecond
+cor_tempo_beats <- cor(data$tempo, data$beats, method = "spearman")
+
+# For Energy vs. Energy-Dance Ratio
+cor_energy_ratio <- cor(data$energy, data$energy_dance_ratio, method = "spearman")
+
+# Print results
+cat("Spearman correlation between Tempo and Beats per Millisecond:", cor_tempo_beats, "\n")
+cat("Spearman correlation between Energy and Energy-Dance Ratio:", cor_energy_ratio, "\n")
+
+```
+### Reasons for using Spearman's correlation:
+
+Non-linear relationships: It can capture monotonic but non-linear relationships, which may be present in the energy vs. energy-dance ratio data.
+
+Robustness: It's less sensitive to outliers, which were observed in the energy vs. energy-dance ratio scatter plot.
+
+No assumption of normality: Unlike Pearson's, Spearman's doesn't assume normally distributed variables.
+
+Rank-based: It uses the ranks of the data rather than the actual values, which can be beneficial when dealing with derived variables like the energy-dance ratio.
+
+
+The moderate correlation (0.6470153) between tempo and beats per millisecond is unexpectedly low, suggesting potential data inconsistencies or calculation issues that warrant further investigation. 
+
+The strong correlation (0.8679517) between energy and energy-dance ratio indicates a clear positive relationship, while also implying that other factors (like danceability) play a role in determining the energy-dance ratio.
+
+
+### 4. Build a confidence interval for each of the response variable(s). Provide a detailed conclusion of the response variable (i.e., the population) based on your confidence interval.
+
+```{r}
+# Function to calculate and print confidence interval
+ci_analysis <- function(data, variable) {
+  ci <- t.test(data[[variable]])$conf.int
+  cat(paste0("95% Confidence Interval for ", variable, ": (", 
+             round(ci[1], 4), ", ", round(ci[2], 4), ")\n"))
+  
+  mean_val <- mean(data[[variable]], na.rm = TRUE)
+  cat(paste0("Sample mean: ", round(mean_val, 4), "\n\n"))
+}
+
+# Calculate CIs for each variable
+ci_analysis(data, "tempo")
+ci_analysis(data, "beats")
+ci_analysis(data, "energy")
+ci_analysis(data, "energy_dance_ratio")
+```
+
+### Interpretation:
+
+1. Tempo: With 95% confidence, the population mean tempo is between 121.1228 and 122.3844 BPM, with a sample mean of 121.7536 BPM, indicating a relatively fast average tempo in the dataset.
+
+2. Beats: The confidence interval and sample mean for beats are both 7e-04, suggesting extremely precise measurement or calculation of this variable, likely derived directly from tempo.
+
+3. Energy: The population mean energy level is estimated to be between 0.7168 and 0.7246, with a sample mean of 0.7207, indicating that tracks in the dataset tend to have relatively high energy levels.
+
+4. Energy-Dance Ratio: The 95% confidence interval for the energy-dance ratio is 1.3015 to 1.3376, with a sample mean of 1.3195, suggesting that on average, the energy of tracks tends to be higher than their danceability.
+
+### Using bootstrap in estimating confidence interval
+
+```{r}
+library(boot)
+# Bootstrap function
+boot_mean <- function(data, indices) {
+  return(mean(data[indices]))
+}
+# Function to perform bootstrap and plot results
+bootstrap_analysis <- function(data, variable, n_boot = 10000) {
+  boot_results <- boot(data[[variable]], boot_mean, R = n_boot)
+  ci <- boot.ci(boot_results, type = "perc")
+  
+  # Plot histogram of bootstrap means
+  df <- data.frame(means = boot_results$t)
+  p <- ggplot(df, aes(x = means)) +
+    geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+    geom_vline(xintercept = ci$percent[4:5], color = "red", linetype = "dashed") +
+    labs(title = paste("Bootstrap Distribution of Mean", variable),
+         x = "Mean", y = "Frequency") +
+    theme_minimal()
+  
+  print(p)
+  
+  cat(paste0("95% Bootstrap CI for ", variable, ": (", 
+             round(ci$percent[4], 4), ", ", round(ci$percent[5], 4), ")\n"))
+  cat(paste0("Sample mean: ", round(mean(data[[variable]], na.rm = TRUE), 4), "\n\n"))
+}
+
+# Perform bootstrap analysis for each variable
+set.seed(123)  # for reproducibility
+bootstrap_analysis(data, "tempo")
+bootstrap_analysis(data, "beats")
+bootstrap_analysis(data, "energy")
+bootstrap_analysis(data, "energy_dance_ratio")
+
+```
+
+### Conclusion
+
+Based on the bootstrap analysis of our Spotify dataset, we can draw the following conclusions:
+
+1. Tempo: The bootstrap 95% confidence interval for the mean tempo is narrow, indicating a precise estimate of the average tempo in the population. The distribution of bootstrap means appears roughly normal, suggesting robustness in our estimate.
+
+2. Beats: The extremely narrow confidence interval for beats per millisecond confirms the direct mathematical relationship with tempo. The lack of variability in the bootstrap distribution underscores the deterministic nature of this variable.
+
+3. Energy: The bootstrap analysis reveals a relatively narrow confidence interval for mean energy, suggesting consistency in energy levels across tracks. The symmetrical distribution of bootstrap means indicates stability in this measure.
+
+4. Energy-Dance Ratio: The wider confidence interval for the energy-dance ratio reflects more variability in this derived measure. The distribution of bootstrap means may show slight skewness, indicating potential complexity in the relationship between energy and danceability.
+
+Overall, the bootstrap results provide robust estimates of population parameters, accounting for potential non-normality and outliers in the data. These insights offer a more nuanced understanding of the musical characteristics in our dataset, particularly useful for applications in music analysis, recommendation systems, or genre classification.
+
